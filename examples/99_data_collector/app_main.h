@@ -57,6 +57,8 @@ class AppMain {
 
   explicit AppMain(const std::string& config_file);
 
+  ~AppMain();
+
   void Wait();
 
   void StartTeleoperation();

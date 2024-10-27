@@ -1,8 +1,9 @@
 [master]
 [master.master_arm]
-robot_address = "192.168.100.26:50051" # Power Control
-#dev_name = "/dev/rby1_master_arm"
-dev_name = "/dev/ttyUSB0"
+# robot_address = "192.168.100.26:50051" # Power Control
+robot_address = "192.168.30.1:50051" # Power Control
+dev_name = "/dev/rby1_master_arm"
+# dev_name = "/dev/ttyUSB0"
 model = "/usr/local/share/rby1-sdk/models/master_arm/model.urdf"
 torque_max = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0,
     3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
@@ -18,7 +19,7 @@ friction_viscous = [0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001,
 
 [slave]
 [slave.robot]
-address = "192.168.100.26:50051"
+address = "192.168.30.1:50051"
 [slave.robot.action]
 mobility = false
 [slave.robot.observation]
@@ -26,7 +27,7 @@ mobility = false
 torque = true # torque
 ft = true # ft
 [slave.gripper]
-dev_name = "/dev/rby1-gripper"
+dev_name = "/dev/rby1_gripper"
 #dev_name = "/dev/ttyUSB0"
 [slave.camera]
 # Only realsense supported
@@ -46,6 +47,6 @@ path = "./"
 
 
 [server]
-robot_address = "192.168.100.26:50051"
+robot_address = "192.168.30.1:50051"
 request_server_port = 5454
 publisher_server_port = 5455

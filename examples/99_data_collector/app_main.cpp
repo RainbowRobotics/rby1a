@@ -34,6 +34,16 @@ AppMain::AppMain(const std::string& config_file) {
   Initialize(config);
 }
 
+AppMain::~AppMain() {
+  if(slave_) {
+    slave_.reset();
+  }
+
+  if (master_) {
+    master_.reset();
+  }
+}
+
 void AppMain::Initialize(const Config& config) {
   using namespace rb;
 
@@ -177,4 +187,8 @@ void AppMain::InitializeServer() {
         } catch (...) {}
       },
       10ms);
+}
+
+void AppMain::Wait() {
+  service_ev_.WaitForTasks();
 }
