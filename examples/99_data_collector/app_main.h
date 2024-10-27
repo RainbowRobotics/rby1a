@@ -55,6 +55,23 @@ class AppMain {
     double upc_storage_capacity{0.};
   };
 
+  class Teleop {
+   public:
+    Teleop(AppMain* app);
+
+    ~Teleop();
+
+    void loop();
+
+   private:
+    AppMain* app_;
+
+    rb::EventLoop loop_;
+    Eigen::Vector<double, rb::y1_model::A::kRobotDOF> qpos_ref_;
+    double right_ratio_{0};
+    double left_ratio_{0};
+  };
+
   explicit AppMain(const std::string& config_file);
 
   ~AppMain();
@@ -69,15 +86,27 @@ class AppMain {
 
   void Ready();
 
+  void StartRecord(std::string file);
+
+  void StopRecord();
+
+  void Record();
+
  private:
   void Initialize(const Config& config);
   void InitializeServer();
 
   Config config_;
 
+  std::unique_ptr<Teleop> teleop_;
+
   std::shared_ptr<rb::Robot<rb::y1_model::A>> robot_;
   std::unique_ptr<rb::y1a::MasterArm> master_;
   std::unique_ptr<rb::y1a::IntegratedRobot> slave_;
+
+  std::shared_ptr<rb::dyn::Robot<rb::y1_model::A::kRobotDOF>> robot_dyn_;
+  std::shared_ptr<rb::dyn::State<rb::y1_model::A::kRobotDOF>> robot_dyn_state_;
+  Eigen::Vector<double, rb::y1_model::A::kRobotDOF> q_lower_limit_, q_upper_limit_;
 
   zmq::context_t zmq_ctx_;
   zmq::socket_t srv_sock_;
@@ -88,4 +117,6 @@ class AppMain {
   rb::EventLoop service_ev_;
 
   State state_;
+
+  friend class Teleop;
 };

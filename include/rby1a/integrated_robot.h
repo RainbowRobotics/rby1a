@@ -120,7 +120,7 @@ class IntegratedRobot {
   std::shared_ptr<Robot<Model>> robot_;
   std::shared_ptr<rb::DynamixelBus> gripper_;
 
-  std::shared_ptr<RobotCommandStreamHandler<Model>> robot_command_stream_handler_;
+  std::unique_ptr<RobotCommandStreamHandler<Model>> robot_command_stream_handler_;
 
   std::atomic<bool> gripper_power_state_{false};
   std::unique_ptr<EventLoop> gripper_loop_;

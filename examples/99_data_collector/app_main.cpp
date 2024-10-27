@@ -6,6 +6,29 @@
 #include "nlohmann/json.hpp"
 #include "zmq_addon.hpp"
 
+namespace {
+nlohmann::json MatToJson(const cv::Mat& mat) {
+  nlohmann::json j;
+  j["rows"] = mat.rows;
+  j["cols"] = mat.cols;
+  j["type"] = mat.type();
+
+  std::vector<uint8_t> data;
+
+  if (mat.isContinuous()) {
+    data.resize(mat.total() * mat.elemSize());
+    std::memcpy(data.data(), mat.data, mat.total() * mat.elemSize());
+  } else {
+    throw std::runtime_error("cv::Mat is not continuous");
+  }
+
+  // Add data to JSON object as a Base64 encoded string or raw data vector
+  j["data"] = data;
+
+  return j;
+}
+}  // namespace
+
 AppMain::AppMain(const std::string& config_file) {
   using namespace toml;
 
@@ -35,7 +58,7 @@ AppMain::AppMain(const std::string& config_file) {
 }
 
 AppMain::~AppMain() {
-  if(slave_) {
+  if (slave_) {
     slave_.reset();
   }
 
@@ -46,6 +69,7 @@ AppMain::~AppMain() {
 
 void AppMain::Initialize(const Config& config) {
   using namespace rb;
+  using namespace std::chrono_literals;
 
   config_ = config;
 
@@ -54,6 +78,10 @@ void AppMain::Initialize(const Config& config) {
   master_ = std::make_unique<y1a::MasterArm>(y1a::MasterArm::ParseConfig(config_.master_config));
 
   slave_ = std::make_unique<y1a::IntegratedRobot>(y1a::IntegratedRobot::ParseConfig(config_.slave_config));
+  if (!slave_->WaitUntilReady(10s)) {
+    std::cout << "error" << std::endl;
+    slave_.reset();
+  }
 
   //  InitializeRecord();
 
@@ -98,6 +126,14 @@ void AppMain::InitializeServer() {
       },
       10 /* (Hz) */);
 
+  robot_dyn_ = robot_->GetDynamics();
+  robot_dyn_state_ =
+      robot_dyn_->MakeState({"base", "link_head_0", "ee_right", "ee_left"}, y1_model::A::kRobotJointNames);
+  robot_dyn_state_->SetGravity({0, 0, 0, 0, 0, -9.81});
+
+  q_upper_limit_ = robot_dyn_->GetLimitQUpper(robot_dyn_state_);
+  q_lower_limit_ = robot_dyn_->GetLimitQLower(robot_dyn_state_);
+
   pub_sock_ = zmq::socket_t(zmq_ctx_, zmq::socket_type::pub);
   pub_sock_.bind("tcp://*:" + std::to_string(config_.server.publisher_server_port));
 
@@ -113,6 +149,9 @@ void AppMain::InitializeServer() {
           state_.upc_storage_free = (double)si.free / (1 << 20);  // MB 단위로 변환
           state_.upc_storage_available = (double)si.available / (1 << 20);
           state_.upc_storage_capacity = (double)si.capacity / (1 << 20);
+
+          state_.master_state = master_->GetState();
+          state_.slave_observation = slave_->GetObservation();
         });
 
         auto state = state_buf_.DoTask([=] { return state_; });
@@ -122,15 +161,25 @@ void AppMain::InitializeServer() {
         j["power_48v"] = state.power_48v;
         j["servo_on"] = state.servo_on;
         j["control_manger"] = state.control_manger;
-        j["running"] = state.teleop;
+        j["teleop"] = state.teleop;
         j["recording"] = state.recording;
         j["recording_count"] = state.recording_count;
         j["storage_available"] = state_.upc_storage_available;
         j["storage_free"] = state_.upc_storage_free;
         j["storage_capacity"] = state_.upc_storage_capacity;
-
         zmq::send_multipart(pub_sock_,
                             std::array<zmq::const_buffer, 2>{zmq::str_buffer("data"), zmq::buffer(j.dump())});
+
+        static auto last_time = std::chrono::steady_clock::now();
+        if (std::chrono::steady_clock::now() - last_time > 500ms) {
+          nlohmann::json image_j;
+          for (const auto& [name, image] : state.slave_observation.images) {
+            image_j[name] = MatToJson(image);
+          }
+          zmq::send_multipart(pub_sock_,
+                              std::array<zmq::const_buffer, 2>{zmq::str_buffer("image"), zmq::buffer(image_j.dump())});
+          last_time = std::chrono::steady_clock::now();
+        }
       },
       100ms);
 
@@ -140,7 +189,7 @@ void AppMain::InitializeServer() {
 
   service_ev_.PushCyclicTask(
       [=] {
-        auto state = state_buf_.DoTask([=] { return state_; });
+        State state = state_buf_.DoTask([=] { return state_; });
 
         try {
           std::vector<zmq::message_t> recv_msgs;
@@ -183,6 +232,10 @@ void AppMain::InitializeServer() {
               action.actions *= M_PI / 180.;
               slave_->Step(action, 5);
             }
+          } else if (command == kCommandStartTeleop) {
+            teleop_ = std::make_unique<Teleop>(this);
+          } else if (command == kCommandStopTeleop) {
+            teleop_.reset();
           }
         } catch (...) {}
       },
@@ -191,4 +244,68 @@ void AppMain::InitializeServer() {
 
 void AppMain::Wait() {
   service_ev_.WaitForTasks();
+}
+
+AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
+  app_->state_.teleop = true;
+
+  std::cout << "Construct tele-operation" << std::endl;
+
+  auto slave_obs = app_->slave_->GetObservation();
+  qpos_ref_ = slave_obs.robot_qpos;
+
+  loop_.PushCyclicTask([=] { loop(); }, std::chrono::nanoseconds((long)(1.e9 / app_->config_.record.fps)));
+}
+
+AppMain::Teleop::~Teleop() {
+  // app_->StopRecording();
+  app_->state_.teleop = false;
+
+  std::cout << "Destruct tele-operation" << std::endl;
+}
+
+void AppMain::Teleop::loop() {
+  const double LpfGain = 0.2;
+  auto slave_obs = app_->slave_->GetObservation();
+  auto master_state = app_->master_->GetState();
+
+  if (master_state.button_right.button) {
+    right_ratio_ = std::min(right_ratio_ + LpfGain / app_->config_.record.fps, LpfGain);
+  } else {
+    right_ratio_ = 0;
+  }
+  if (master_state.button_left.button) {
+    left_ratio_ = std::min(left_ratio_ + LpfGain / app_->config_.record.fps, LpfGain);
+  } else {
+    left_ratio_ = 0;
+  }
+  qpos_ref_.block<7, 1>(2 + 6, 0) =
+      qpos_ref_.block<7, 1>(2 + 6, 0) * (1 - right_ratio_) + master_state.q_joint.block<7, 1>(0, 0) * right_ratio_;
+  qpos_ref_.block<7, 1>(2 + 6 + 7, 0) =
+      qpos_ref_.block<7, 1>(2 + 6 + 7, 0) * (1 - left_ratio_) + master_state.q_joint.block<7, 1>(7, 0) * left_ratio_;
+
+  //
+  app_->robot_dyn_state_->SetQ(slave_obs.robot_qpos);
+  app_->robot_dyn_->ComputeForwardKinematics(app_->robot_dyn_state_);
+  auto T_12 = app_->robot_dyn_->ComputeTransformation(app_->robot_dyn_state_, 1, 2);
+  auto T_13 = app_->robot_dyn_->ComputeTransformation(app_->robot_dyn_state_, 1, 3);
+  Eigen::Vector3d center = (rb::math::SE3::GetPosition(T_12) + rb::math::SE3::GetPosition(T_13)) / 2.;
+  double yaw = atan2(center(1), center(0));
+  double pitch = atan2(-center(2), center(0)) + 15 * M_PI / 180.;
+  yaw = std::clamp(yaw, -0.523, 0.523);  // TODO
+  pitch = std::clamp(pitch, -0.35, 1.57);
+  qpos_ref_.block<2, 1>(2 + 6 + 7 + 7, 0) = Eigen::Vector<double, 2>{yaw, pitch};
+  for (int i = 0; i < 14 + 2; i++) {
+    qpos_ref_(2 + 6 + i) =
+        std::clamp(qpos_ref_(2 + 6 + i), app_->q_lower_limit_(2 + 6 + i), app_->q_upper_limit_(2 + 6 + i));
+  }
+
+  rb::y1a::IntegratedRobot::Action action;
+  action.actions.head<rb::y1a::IntegratedRobot::kRobotDOF>() = qpos_ref_;
+  action.actions.tail<rb::y1a::IntegratedRobot::kGripperDOF>() =
+      Eigen::Vector2d::Constant(1.) -
+      Eigen::Vector2d{master_state.button_right.trigger, master_state.button_left.trigger} / 1000.;
+  app_->slave_->Step(action, 1 / app_->config_.record.fps * 1.05);
+
+  // app_->Record(slave_obs, action);
 }

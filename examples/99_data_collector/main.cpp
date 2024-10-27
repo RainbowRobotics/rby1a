@@ -6,6 +6,8 @@
 std::unique_ptr<AppMain> app;
 
 void signal_handler(int signum) {
+  std::cout << "signal handler" << std::endl;
+
   if (app) {
     app.reset();
   }
@@ -27,6 +29,8 @@ int main(int argc, char** argv) {
 
   app = std::make_unique<AppMain>(config_file);
   app->Wait();
+
+  std::cout << "Finished" << std::endl;
 
   return 0;
 }

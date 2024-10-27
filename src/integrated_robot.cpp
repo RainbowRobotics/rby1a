@@ -210,7 +210,7 @@ void IntegratedRobot::Initialize_gripper() {
           return;
         }
 
-        auto [o, p, t] = gripper_buf_.DoTask([=] {
+        auto [o, t, p] = gripper_buf_.DoTask([=] {
           return std::make_tuple(gripper_target_operation_mode, gripper_target_torque, gripper_target_position);
         });
         target_operation_mode = o;
@@ -440,7 +440,7 @@ void IntegratedRobot::Initialize_camera() {
                                        (void*)depth.get_data(), cv::Mat::AUTO_STEP);
             cv::Mat scaled_depth_image;
             depth_image.convertTo(scaled_depth_image, CV_32FC1);
-            scaled_depth_image /= scale;
+            scaled_depth_image *= scale;
             observation_buf_.PushTask([name, depth_image = scaled_depth_image.clone(), current_time, this] {
               obs_state.camera_updated_time = current_time;
               obs.images[name + "_depth"] = depth_image;
@@ -492,8 +492,8 @@ void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum
     return;
   }
 
-  auto torso_velocity_limit = Eigen::Vector<double, 2>::Constant(160. * M_PI / 180. * 0.9);
-  auto torso_acc_limit = Eigen::Vector<double, 2>::Constant(600. * M_PI / 180. * 1.5);
+  auto torso_velocity_limit = Eigen::Vector<double, 6>::Constant(160. * M_PI / 180. * 0.9);
+  auto torso_acc_limit = Eigen::Vector<double, 6>::Constant(600. * M_PI / 180. * 1.5);
 
   Eigen::Vector<double, 7> arm_velocity_limit;
   arm_velocity_limit << 160, 160, 160, 160, 330, 330, 330;
@@ -533,7 +533,7 @@ void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum
                                      .SetVelocityLimit(arm_velocity_limit)
                                      .SetAccelerationLimit(arm_acc_limit)))
       .SetHeadCommand(JointPositionCommandBuilder()
-                          .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(4.))
+                          .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9))
                           .SetMinimumTime(minimum_time)
                           .SetPosition(action.actions.block<2, 1>(2 + 6 + 7 + 7, 0))
                           .SetVelocityLimit(head_velocity_limit)
@@ -565,6 +565,7 @@ IntegratedRobot::Observation& IntegratedRobot::Observation::operator=(const Obse
   for (const auto& [name, image] : other.images) {
     images[name] = image.clone();
   }
+  robot_qpos_ref = other.robot_qpos_ref;
   return *this;
 }
 
