@@ -64,13 +64,18 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.set_background_color(self.LE_12v, COLOR_GREEN if data["power_12v"] else COLOR_RED)
                     self.set_background_color(self.LE_48v, COLOR_GREEN if data["power_48v"] else COLOR_RED)
                     self.set_background_color(self.LE_ServoOn, COLOR_GREEN if data["servo_on"] else COLOR_RED)
-                    self.set_background_color(self.LE_ServoOn, COLOR_GREEN if data["control_manger"] else COLOR_RED)
+                    self.set_background_color(self.LE_ControlManager,
+                                              COLOR_GREEN if data["control_manger"] else COLOR_RED)
                     self.set_background_color(self.LE_Running, COLOR_GREEN if data["running"] else COLOR_RED)
                     self.set_background_color(self.LE_Recording, COLOR_GREEN if data["recording"] else COLOR_RED)
-                    self.L_RecordingCount.setText(data["recording_count"])
-                    self.LE_UPCStorageFree.setText(data["storage_free"])
-                    self.LE_UPCStorageAvailable.setText(data["storage_available"])
-                    self.LE_UPCStorageCapacity.setText(data["storage_capacity"])
+                    self.L_RecordingCount.setText(str(data["recording_count"]))
+                    self.LE_UPCStorageFree.setText(str(data["storage_free"]))
+                    self.LE_UPCStorageAvailable.setText(str(data["storage_available"]))
+                    self.LE_UPCStorageCapacity.setText(str(data["storage_capacity"]))
+
+            flags = self.sub.getsockopt(zmq.EVENTS)
+
+        self.notifier.setEnabled(True)
 
     @staticmethod
     def set_background_color(le, color):
@@ -82,8 +87,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="data_collector_gui")
     parser.add_argument('--address', type=str, required=True, help="UPC Address")
-    parser.add_argument('--cmd_port', type=int, default=5000, help="UPC Command Port")
-    parser.add_argument('--data_port', type=int, default=5001, help="UPC Data Port")
+    parser.add_argument('--cmd_port', type=int, default=5454, help="UPC Command Port")
+    parser.add_argument('--data_port', type=int, default=5455, help="UPC Data Port")
     args = parser.parse_args()
 
     app = QApplication()
