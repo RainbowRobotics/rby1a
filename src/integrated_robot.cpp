@@ -141,9 +141,13 @@ void IntegratedRobot::initialize_robot() {
             obs.left_ft.head<3>() = rs.ft_sensor_left.torque;
             obs.left_ft.tail<3>() = rs.ft_sensor_left.force;
           }
+          obs.robot_qpos_ref = rs.target_position;
         });
       },
       100 /* (Hz) */);
+
+  robot_->ResetAllParametersToDefault();
+  robot_->SetParameter("joint_position_command.cutoff_frequency", "4.0");
 
   auto state = robot_->GetState();
   robot_command_stream_handler_ = robot_->CreateCommandStream();
@@ -434,17 +438,17 @@ void IntegratedRobot::initialize_camera() {
 }
 
 bool IntegratedRobot::IsReady() {
-  //  if (robot_command_stream_handler_) {
-  //    if (robot_command_stream_handler_->IsDone()) {
-  //      return false;
-  //    }
-  //  } else {
-  //    return false;
-  //  }
-  //
-  //  if (gripper_state_.load() != 4) {
-  //    return false;
-  //  }
+  if (robot_command_stream_handler_) {
+    if (robot_command_stream_handler_->IsDone()) {
+      return false;
+    }
+  } else {
+    return false;
+  }
+
+  if (gripper_state_.load() != 4) {
+    return false;
+  }
 
   if (obs.images.size() != config_.camera.sensors.size() * 2 /* rgb, depth */) {
     return false;
@@ -550,4 +554,4 @@ IntegratedRobot::Observation& IntegratedRobot::Observation::operator=(const Obse
   return *this;
 }
 
-}  // namespace rb
+}  // namespace rb::y1a

@@ -69,6 +69,9 @@ class IntegratedRobot {
     Eigen::Vector<double, 6> left_ft;   // if ft is enabled
 
     std::unordered_map<std::string, cv::Mat> images;
+
+    // TEMP
+    Eigen::Vector<double, kRobotDOF> robot_qpos_ref;
   };
 
   struct ObservationState {
