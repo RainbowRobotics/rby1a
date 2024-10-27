@@ -7,7 +7,7 @@
 #include "rby1a/integrated_robot.h"
 
 using namespace std::chrono_literals;
-using namespace rb::dc;
+using namespace rb::y1a;
 
 int main(int argc, char** argv) {
   if (argc < 2) {

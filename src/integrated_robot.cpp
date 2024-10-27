@@ -4,7 +4,7 @@
 #include "rby1a/integrated_robot.h"
 #include "toml++/toml.hpp"
 
-namespace rb::dc {
+namespace rb::y1a {
 
 IntegratedRobot::IntegratedRobot(const Config& config) {
   initialize(config);
@@ -156,8 +156,9 @@ void IntegratedRobot::initialize_gripper() {
     // Latency timer setting
     upc::InitializeDevice(config_.gripper.dev_name);
   } catch (std::exception& e) {
-    std::cerr << e.what() << std::endl;
-    exit(1);
+    std::stringstream ss;
+    ss << "Failed to initialize device: " << e.what();
+    throw std::runtime_error(ss.str());
   }
 
   gripper_ = std::make_unique<rb::DynamixelBus>(config_.gripper.dev_name);
@@ -468,7 +469,7 @@ IntegratedRobot::Observation IntegratedRobot::GetObservation() {
   return observation_buf_.DoTask([=] { return obs; });
 }
 
-void IntegratedRobot::Step(const rb::dc::IntegratedRobot::Action& action, double minimum_time) {
+void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum_time) {
   if (!IsReady()) {
     return;
   }
@@ -549,4 +550,4 @@ IntegratedRobot::Observation& IntegratedRobot::Observation::operator=(const Obse
   return *this;
 }
 
-}  // namespace rb::dc
+}  // namespace rb

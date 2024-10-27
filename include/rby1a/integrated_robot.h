@@ -10,7 +10,7 @@
 #include <librealsense2/rs_advanced_mode.hpp>
 #include <opencv2/opencv.hpp>
 
-namespace rb::dc {
+namespace rb::y1a {
 
 class IntegratedRobot {
  public:
@@ -128,4 +128,4 @@ class IntegratedRobot {
   std::unique_ptr<EventLoop> camera_loop_;
 };
 
-}  // namespace rb::dc
+}  // namespace rb::y1a

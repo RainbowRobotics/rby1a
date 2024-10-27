@@ -4,3 +4,10 @@ add_executable(example_robot
 target_link_libraries(example_robot PRIVATE
     rby1a
 )
+
+add_executable(example_master_arm
+        master_arm.cpp
+)
+target_link_libraries(example_master_arm PRIVATE
+        rby1a
+)

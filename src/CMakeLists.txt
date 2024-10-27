@@ -1,5 +1,6 @@
 add_library(rby1a
         integrated_robot.cpp
+        master_arm.cpp
 )
 target_include_directories(rby1a PUBLIC
         ${CMAKE_SOURCE_DIR}/include
