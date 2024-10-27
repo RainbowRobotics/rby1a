@@ -123,12 +123,10 @@ void IntegratedRobot::Initialize_robot() {
     if (!robot_->PowerOn("48v")) {
       throw std::runtime_error("failed to power on");
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    robot_->SetToolFlangeOutputVoltage("left", 12);
-    robot_->SetToolFlangeOutputVoltage("right", 12);
   }
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  robot_->SetToolFlangeOutputVoltage("left", 12);
+  robot_->SetToolFlangeOutputVoltage("right", 12);
   if (!robot_->IsServoOn(".*")) {
     if (!robot_->ServoOn(".*")) {
       throw std::runtime_error("failed to servo on");

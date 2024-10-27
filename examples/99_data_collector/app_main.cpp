@@ -34,6 +34,16 @@ AppMain::AppMain(const std::string& config_file) {
   Initialize(config);
 }
 
+AppMain::~AppMain() {
+  if(slave_) {
+    slave_.reset();
+  }
+
+  if (master_) {
+    master_.reset();
+  }
+}
+
 void AppMain::Initialize(const Config& config) {
   using namespace rb;
 
