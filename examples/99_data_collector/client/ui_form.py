@@ -104,12 +104,12 @@ class Ui_MainWindow(object):
 
         self.gridLayout.addWidget(self.label_13, 6, 0, 1, 1)
 
-        self.LE_Running = QLineEdit(self.frame)
-        self.LE_Running.setObjectName(u"LE_Running")
-        self.LE_Running.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.LE_Running.setReadOnly(True)
+        self.LE_Teleop = QLineEdit(self.frame)
+        self.LE_Teleop.setObjectName(u"LE_Teleop")
+        self.LE_Teleop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.LE_Teleop.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.LE_Running, 6, 1, 1, 1)
+        self.gridLayout.addWidget(self.LE_Teleop, 6, 1, 1, 1)
 
 
         self.verticalLayout.addLayout(self.gridLayout)
@@ -199,6 +199,7 @@ class Ui_MainWindow(object):
 
         self.LE_UPCStorageFree = QLineEdit(self.groupBox)
         self.LE_UPCStorageFree.setObjectName(u"LE_UPCStorageFree")
+        self.LE_UPCStorageFree.setFont(font1)
         self.LE_UPCStorageFree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.LE_UPCStorageFree.setReadOnly(True)
 
@@ -212,6 +213,7 @@ class Ui_MainWindow(object):
 
         self.LE_UPCStorageAvailable = QLineEdit(self.groupBox)
         self.LE_UPCStorageAvailable.setObjectName(u"LE_UPCStorageAvailable")
+        self.LE_UPCStorageAvailable.setFont(font1)
         self.LE_UPCStorageAvailable.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.LE_UPCStorageAvailable.setReadOnly(True)
 
@@ -225,6 +227,7 @@ class Ui_MainWindow(object):
 
         self.LE_UPCStorageCapacity = QLineEdit(self.groupBox)
         self.LE_UPCStorageCapacity.setObjectName(u"LE_UPCStorageCapacity")
+        self.LE_UPCStorageCapacity.setFont(font1)
         self.LE_UPCStorageCapacity.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.LE_UPCStorageCapacity.setReadOnly(True)
 
@@ -352,41 +355,41 @@ class Ui_MainWindow(object):
         self.frame_4.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout_2 = QGridLayout(self.frame_4)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.label_15 = QLabel(self.frame_4)
-        self.label_15.setObjectName(u"label_15")
-        self.label_15.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam0Depth = QLabel(self.frame_4)
+        self.L_Cam0Depth.setObjectName(u"L_Cam0Depth")
+        self.L_Cam0Depth.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_15, 1, 1, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam0Depth, 1, 1, 1, 1)
 
-        self.label_14 = QLabel(self.frame_4)
-        self.label_14.setObjectName(u"label_14")
-        self.label_14.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam1RGB = QLabel(self.frame_4)
+        self.L_Cam1RGB.setObjectName(u"L_Cam1RGB")
+        self.L_Cam1RGB.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_14, 0, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam1RGB, 0, 0, 1, 1)
 
-        self.label_17 = QLabel(self.frame_4)
-        self.label_17.setObjectName(u"label_17")
-        self.label_17.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam1Depth = QLabel(self.frame_4)
+        self.L_Cam1Depth.setObjectName(u"L_Cam1Depth")
+        self.L_Cam1Depth.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_17, 1, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam1Depth, 1, 0, 1, 1)
 
-        self.label_16 = QLabel(self.frame_4)
-        self.label_16.setObjectName(u"label_16")
-        self.label_16.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam0RGB = QLabel(self.frame_4)
+        self.L_Cam0RGB.setObjectName(u"L_Cam0RGB")
+        self.L_Cam0RGB.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_16, 0, 1, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam0RGB, 0, 1, 1, 1)
 
-        self.label_18 = QLabel(self.frame_4)
-        self.label_18.setObjectName(u"label_18")
-        self.label_18.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam2RGB = QLabel(self.frame_4)
+        self.L_Cam2RGB.setObjectName(u"L_Cam2RGB")
+        self.L_Cam2RGB.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_18, 0, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam2RGB, 0, 2, 1, 1)
 
-        self.label_19 = QLabel(self.frame_4)
-        self.label_19.setObjectName(u"label_19")
-        self.label_19.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.L_Cam2Depth = QLabel(self.frame_4)
+        self.L_Cam2Depth.setObjectName(u"L_Cam2Depth")
+        self.L_Cam2Depth.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_2.addWidget(self.label_19, 1, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.L_Cam2Depth, 1, 2, 1, 1)
 
 
         self.horizontalLayout_5.addWidget(self.frame_4)
@@ -434,7 +437,7 @@ class Ui_MainWindow(object):
         self.label_3.setText(QCoreApplication.translate("MainWindow", u"Power", None))
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Servo On", None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"12v (Master Arm)", None))
-        self.label_13.setText(QCoreApplication.translate("MainWindow", u"Running", None))
+        self.label_13.setText(QCoreApplication.translate("MainWindow", u"Tele-operation", None))
         self.PB_ResetMaster.setText(QCoreApplication.translate("MainWindow", u"Reset Master (MasterArm)", None))
         self.PB_ResetSlave.setText(QCoreApplication.translate("MainWindow", u"Reset Slave (Robot)", None))
         self.PB_Zero.setText(QCoreApplication.translate("MainWindow", u"Zero", None))
@@ -455,11 +458,11 @@ class Ui_MainWindow(object):
         self.PB_StopRecording.setText(QCoreApplication.translate("MainWindow", u"Stop\n"
 "Recording", None))
         self.L_RecordingCount.setText(QCoreApplication.translate("MainWindow", u"0", None))
-        self.label_15.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
-        self.label_14.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
-        self.label_17.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
-        self.label_16.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
-        self.label_18.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
-        self.label_19.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam0Depth.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam1RGB.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam1Depth.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam0RGB.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam2RGB.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
+        self.L_Cam2Depth.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
     # retranslateUi
 
