@@ -1,0 +1,51 @@
+[master]
+[master.master_arm]
+robot_address = "192.168.100.26:50051" # Power Control
+#dev_name = "/dev/rby1_master_arm"
+dev_name = "/dev/ttyUSB0"
+model = "/usr/local/share/rby1-sdk/models/master_arm/model.urdf"
+torque_max = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
+q_min = [-6.28318531, -0.52359878, 0.0, -2.35619449, -1.57079633, 0.61086524, -6.28318531,
+    -6.28318531, 0.17453293, -1.57079633, -2.35619449, -1.57079633, 0.61086524, -6.28318531]
+q_max = [6.28318531, -0.17453293, 1.57079633, -1.04719755, 1.57079633, 1.3962634, 6.28318531,
+    6.28318531, 0.52359878, 0.0, -1.04719755, 1.57079633, 1.3962634, 6.28318531]
+limit_barrier_gain = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+friction_viscous = [0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001,
+    0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001]
+
+
+[slave]
+[slave.robot]
+address = "192.168.100.26:50051"
+[slave.robot.action]
+mobility = false
+[slave.robot.observation]
+# qpos, qvel
+torque = true # torque
+ft = true # ft
+[slave.gripper]
+dev_name = "/dev/rby1-gripper"
+#dev_name = "/dev/ttyUSB0"
+[slave.camera]
+# Only realsense supported
+height = 240
+width = 424
+fps = 60
+sensors = [
+    { name = "cam0", serial = "233522071632" },
+    { name = "cam1", serial = "218622270382" },
+    { name = "cam2", serial = "128422271273" }
+]
+
+
+[record]
+fps = 30 # (Hz)
+path = "./"
+
+
+[server]
+robot_address = "192.168.100.26:50051"
+request_server_port = 5454
+publisher_server_port = 5455

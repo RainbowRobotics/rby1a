@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "data-collector-client"
+version = "0.1.0"
+description = ""
+authors = ["Keunjun Choi <keunjun.choi@rainbow-robotics.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.14"
+pyside6 = "^6.8.0.2"
+zmq = "^0.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

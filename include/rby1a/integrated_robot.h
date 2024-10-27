@@ -86,6 +86,8 @@ class IntegratedRobot {
     // gripper >= 0 <= 1
   };
 
+  static Config ParseConfig(const std::string& toml_str);
+
   explicit IntegratedRobot(const Config& config);
 
   explicit IntegratedRobot(const std::string& config_file);
@@ -101,10 +103,10 @@ class IntegratedRobot {
   void Step(const Action& action, double minimum_time = 1 /* (sec) */);
 
  private:
-  void initialize(const Config& config);
-  void initialize_robot();
-  void initialize_gripper();
-  void initialize_camera();
+  void Initialize(const Config& config);
+  void Initialize_robot();
+  void Initialize_gripper();
+  void Initialize_camera();
 
   rs2::context rs_ctx;
 

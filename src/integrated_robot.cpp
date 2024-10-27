@@ -4,17 +4,26 @@
 #include "rby1a/integrated_robot.h"
 #include "toml++/toml.hpp"
 
+namespace {
+std::string ReadFileToString(const std::string& filePath) {
+  std::ifstream file(filePath);
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file: " + filePath);
+  }
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+}  // namespace
+
 namespace rb::y1a {
 
-IntegratedRobot::IntegratedRobot(const Config& config) {
-  initialize(config);
-}
-
-IntegratedRobot::IntegratedRobot(const std::string& config_file) {
+IntegratedRobot::Config IntegratedRobot::ParseConfig(const std::string& toml_str) {
   using namespace toml;
 
   Config config;
-  auto tbl = toml::parse_file(config_file);
+  auto tbl = toml::parse(toml_str);
 
   ConfigRobot& config_robot = config.robot;
   auto robot = tbl["robot"];
@@ -56,8 +65,15 @@ IntegratedRobot::IntegratedRobot(const std::string& config_file) {
     });
   }
 
-  initialize(config);
+  return config;
 }
+
+IntegratedRobot::IntegratedRobot(const Config& config) {
+  Initialize(config);
+}
+
+IntegratedRobot::IntegratedRobot(const std::string& config_file)
+    : IntegratedRobot(ParseConfig(ReadFileToString(config_file))) {}
 
 IntegratedRobot::~IntegratedRobot() {
   gripper_loop_.reset();
@@ -78,26 +94,26 @@ IntegratedRobot::~IntegratedRobot() {
   //  robot_->PowerOff("48v");
 }
 
-void IntegratedRobot::initialize(const Config& config) {
+void IntegratedRobot::Initialize(const Config& config) {
   config_ = config;
 
   /********************************
    * Robot
    ********************************/
-  initialize_robot();
+  Initialize_robot();
 
   /********************************
    * Gripper
    ********************************/
-  initialize_gripper();
+  Initialize_gripper();
 
   /********************************
    * Camera
    ********************************/
-  initialize_camera();
+  Initialize_camera();
 }
 
-void IntegratedRobot::initialize_robot() {
+void IntegratedRobot::Initialize_robot() {
   robot_ = Robot<Model>::Create(config_.robot.address);
   if (!robot_->Connect(1 /* iteration */, 1000 /* (ms) */)) {
     throw std::runtime_error("failed to connect robot");
@@ -153,7 +169,7 @@ void IntegratedRobot::initialize_robot() {
   robot_command_stream_handler_ = robot_->CreateCommandStream();
 }
 
-void IntegratedRobot::initialize_gripper() {
+void IntegratedRobot::Initialize_gripper() {
   static const std::vector<double> gripper_torque_constant{1.6591, 1.6591};
 
   try {
@@ -319,7 +335,7 @@ void IntegratedRobot::initialize_gripper() {
       std::chrono::milliseconds(1000 / 30));
 }
 
-void IntegratedRobot::initialize_camera() {
+void IntegratedRobot::Initialize_camera() {
   std::vector<rs2::pipeline> rs_pipelines;
   std::unordered_map<std::string, double> depth_scales;
 

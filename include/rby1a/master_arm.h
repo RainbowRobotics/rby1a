@@ -31,6 +31,8 @@ class MasterArm {
                                                                  0.01, 0.01, 0.01, 0.01, 0.005, 0.005, 0.001};
   };
 
+  static Config ParseConfig(const std::string& toml_str);
+
   explicit MasterArm(const Config& config);
 
   explicit MasterArm(const std::string& config_file);
@@ -40,7 +42,7 @@ class MasterArm {
   upc::MasterArm::State GetState();
 
  private:
-  void initialize(const Config& config);
+  void Initialize(const Config& config);
 
   Config config_;
   EventLoop state_buf_;

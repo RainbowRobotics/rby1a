@@ -1,8 +1,8 @@
 add_executable(example_robot
-    robot.cpp
+        robot.cpp
 )
 target_link_libraries(example_robot PRIVATE
-    rby1a
+        rby1a
 )
 
 add_executable(example_master_arm
@@ -11,3 +11,5 @@ add_executable(example_master_arm
 target_link_libraries(example_master_arm PRIVATE
         rby1a
 )
+
+add_subdirectory(99_data_collector)

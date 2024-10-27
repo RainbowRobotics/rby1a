@@ -2,17 +2,26 @@
 
 #include "toml++/toml.hpp"
 
+namespace {
+std::string ReadFileToString(const std::string& filePath) {
+  std::ifstream file(filePath);
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file: " + filePath);
+  }
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
+}  // namespace
+
 namespace rb::y1a {
 
-MasterArm::MasterArm(const MasterArm::Config& config) {
-  initialize(config);
-}
-
-MasterArm::MasterArm(const std::string& config_file) {
+MasterArm::Config MasterArm::ParseConfig(const std::string& toml_str) {
   using namespace toml;
 
   Config config;
-  auto tbl = toml::parse_file(config_file);
+  auto tbl = toml::parse(toml_str);
   auto master_arm = tbl["master_arm"];
 
   config.robot_address = master_arm["robot_address"].value_or(config.robot_address);
@@ -38,8 +47,14 @@ MasterArm::MasterArm(const std::string& config_file) {
   config.limit_barrier_gain = get_values("limit_barrier_gain", config.limit_barrier_gain);
   config.friction_viscous = get_values("friction_viscous", config.friction_viscous);
 
-  initialize(config);
+  return config;
 }
+
+MasterArm::MasterArm(const MasterArm::Config& config) {
+  Initialize(config);
+}
+
+MasterArm::MasterArm(const std::string& config_file) : MasterArm(ParseConfig(ReadFileToString(config_file))) {}
 
 MasterArm::~MasterArm() {
   robot_->PowerOff("12v");
@@ -49,7 +64,7 @@ upc::MasterArm::State MasterArm::GetState() {
   return state_buf_.DoTask([=] { return state_; });
 }
 
-void MasterArm::initialize(const MasterArm::Config& config) {
+void MasterArm::Initialize(const MasterArm::Config& config) {
   config_ = config;
 
   /********************************
