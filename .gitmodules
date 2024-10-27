@@ -13,3 +13,6 @@
 [submodule "examples/99_data_collector/third-party/HighFive"]
 	path = examples/99_data_collector/third-party/HighFive
 	url = https://github.com/BlueBrain/HighFive.git
+[submodule "third-party/eigen"]
+	path = third-party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
