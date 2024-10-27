@@ -10,6 +10,7 @@ int main(int argc, char** argv) {
   std::string config_file{argv[1]};
 
   AppMain app(config_file);
+  app.Wait();
 
   return 0;
 }

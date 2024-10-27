@@ -178,3 +178,7 @@ void AppMain::InitializeServer() {
       },
       10ms);
 }
+
+void AppMain::Wait() {
+  service_ev_.WaitForTasks();
+}
