@@ -57,6 +57,7 @@ MasterArm::MasterArm(const MasterArm::Config& config) {
 MasterArm::MasterArm(const std::string& config_file) : MasterArm(ParseConfig(ReadFileToString(config_file))) {}
 
 MasterArm::~MasterArm() {
+  std::cout << "destructo master arm" << std::endl;
   robot_->PowerOff("12v");
 }
 

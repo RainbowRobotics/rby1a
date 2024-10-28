@@ -1,3 +1,9 @@
+// Add this at the top of your source file
+#if __INTELLISENSE__
+#undef __ARM_NEON
+#undef __ARM_NEON__
+#endif
+
 #pragma once
 
 #include <iostream>
@@ -5,6 +11,7 @@
 #include <rby1a/integrated_robot.h>
 #include <rby1a/master_arm.h>
 
+#include "highfive/H5Easy.hpp"
 #include "toml++/toml.hpp"
 #include "zmq.hpp"
 
@@ -86,14 +93,15 @@ class AppMain {
 
   void Ready();
 
-  void StartRecord(std::string file);
+  void StartRecord(const std::string& file);
 
   void StopRecord();
 
-  void Record();
+  void Record(rb::y1a::IntegratedRobot::Observation observation, rb::y1a::IntegratedRobot::Action action);
 
  private:
   void Initialize(const Config& config);
+
   void InitializeServer();
 
   Config config_;
@@ -115,8 +123,18 @@ class AppMain {
   rb::EventLoop state_buf_;
   rb::EventLoop publisher_ev_;
   rb::EventLoop service_ev_;
+  rb::EventLoop record_ev_;
 
   State state_;
+
+  std::unique_ptr<HighFive::File> record_file_{nullptr};
+  std::vector<std::unique_ptr<HighFive::DataSet>> record_depth_datasets_;
+  std::vector<std::unique_ptr<HighFive::DataSet>> record_rgb_datasets_;
+  std::unique_ptr<HighFive::DataSet> record_action_dataset_;
+  std::unique_ptr<HighFive::DataSet> record_qpos_dataset_;
+  std::unique_ptr<HighFive::DataSet> record_qvel_dataset_;
+  std::unique_ptr<HighFive::DataSet> record_torque_dataset_;
+  std::unique_ptr<HighFive::DataSet> record_ft_dataset_;
 
   friend class Teleop;
 };

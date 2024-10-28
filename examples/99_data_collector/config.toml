@@ -42,7 +42,7 @@ sensors = [
 
 
 [record]
-fps = 30 # (Hz)
+fps = 50 # (Hz)
 path = "./"
 
 

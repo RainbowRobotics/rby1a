@@ -83,6 +83,7 @@ IntegratedRobot::~IntegratedRobot() {
     std::cout << "try to cancel robot command stream ...";
     robot_command_stream_handler_->Cancel();
     robot_command_stream_handler_->Wait();
+    robot_command_stream_handler_.reset();
     std::cout << " - finished" << std::endl;
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
