@@ -3,17 +3,28 @@
 //
 
 #include <iostream>
+#include <queue>
 
+#include "nlohmann/json.hpp"
 #include "rby1a/integrated_robot.h"
+#include "utils.h"
 #include "zmq.hpp"
-
-#define RBY1A_DEBUG
 
 using namespace std::chrono_literals;
 using namespace rb::y1a;
+using namespace nlohmann;
 
 zmq::context_t zmq_ctx;
 zmq::socket_t sock_;
+
+struct TimedAction {
+  long timestamp{0};
+  IntegratedRobot::Action action;
+};
+
+struct comp {
+  bool operator()(const TimedAction& l, const TimedAction& r) { return l.timestamp > r.timestamp; }
+};
 
 int main(int argc, char** argv) {
   if (argc < 3) {
@@ -23,8 +34,8 @@ int main(int argc, char** argv) {
   std::string config_file{argv[1]};
   std::string inference_address{argv[2]};
 
-  sock_ = zmq::socket_t(zmq_ctx, zmq::socket_type::client);
-  sock_.bind(inference_address);
+  sock_ = zmq::socket_t(zmq_ctx, zmq::socket_type::req);
+  sock_.connect(inference_address);
 
   IntegratedRobot robot(config_file);
   if (!robot.WaitUntilReady(10s)) {
@@ -39,11 +50,9 @@ int main(int argc, char** argv) {
       break;
     }
     if (c == 'z') {
-#ifndef RBY1A_DEBUG
       IntegratedRobot::Action action;
       action.actions.setZero();
       robot.Step(action, 5);
-#endif
     }
   }
 
@@ -56,20 +65,24 @@ int main(int argc, char** argv) {
     }
   }
 
-  auto obs = robot.GetObservation();
-#ifndef RBY1A_DEBUG
-  IntegratedRobot::Action action;
-  action.actions.block<2, 1>(0, 0).setZero();                  // Mobility
-  action.actions.block<20, 1>(2, 0) << 0, 40, -70, 30, 0, 0,   // Torso
-      -30, -10, 0, -100, 0, 40, 0,                             // Right
-      -30, 10, 0, -100, 0, 40, 0;                              // Left
-  action.actions.block<2, 1>(2 + 20, 0) << 0, 0;               // Head
-  action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0).setZero();  // Gripper
-  action.actions *= M_PI / 180.;
-  robot.Step(action, 5);
-#endif
+  {
+    auto obs = robot.GetObservation();
+    IntegratedRobot::Action action;
+    action.actions.block<2, 1>(0, 0).setZero();                  // Mobility
+    action.actions.block<20, 1>(2, 0) << 0, 40, -70, 30, 0, 0,   // Torso
+        -30, -10, 0, -100, 0, 40, 0,                             // Right
+        -30, 10, 0, -100, 0, 40, 0;                              // Left
+    action.actions.block<2, 1>(2 + 20, 0) << 0, 0;               // Head
+    action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0).setZero();  // Gripper
+    action.actions *= M_PI / 180.;
+    robot.Step(action, 5);
+  }
 
-  std::this_thread::sleep_for(5s);
+  for(int i = 0; i < 6; i++) {
+    std::cout << ".";
+    std::flush(std::cout);
+    std::this_thread::sleep_for(1s);
+  }
 
   /*****************************************************************
    *
@@ -79,15 +92,115 @@ int main(int argc, char** argv) {
   rt_thread->SetOSPriority(90, SCHED_RR);
   rb::EventLoop loop(std::move(rt_thread));
 
-//  std::future<void>
+  std::future<std::pair<long, std::vector<rb::y1a::IntegratedRobot::Action>>> inference_future;
+  std::vector<std::pair<long, rb::y1a::IntegratedRobot::Action>> inference_result;
+
+  std::priority_queue<TimedAction, std::vector<TimedAction>, comp> que;
+
+  rb::y1a::IntegratedRobot::Action action;
+  action.actions.setZero();
+  {
+    auto obs = robot.GetObservation();
+    action.actions.setZero();
+    action.actions.head<rb::y1a::IntegratedRobot::kRobotDOF>() = obs.robot_qpos;
+    action.actions.tail<rb::y1a::IntegratedRobot::kGripperDOF>() = obs.gripper_qpos;
+  }
 
   auto fps = 50.;
   auto dt = 1. / fps;
+  auto dt_micro = (long)(dt * 1e6);
+  auto lpf_gain = 0.2;
   loop.PushCyclicTask(
       [&] {
+        auto obs = robot.GetObservation();
+        auto current_time =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                .count();
 
+        bool done = true;
+        if (inference_future.valid()) {
+          if (inference_future.wait_for(0s) == std::future_status::timeout) {
+            done = false;
+          } else if (inference_future.wait_for(0s) == std::future_status::ready) {
+            auto inference_result = inference_future.get();
+            long start = inference_result.first;
+            for (int i = 0; i < inference_result.second.size(); i++) {
+              TimedAction ta;
+              ta.timestamp = start + dt_micro * (i + 1);
+              ta.action = inference_result.second[i];
+              if (ta.timestamp >= current_time) {
+                que.push(ta);
+              }
+            }
+          }
+        }
+        if (done) {
+          inference_future = std::async(std::launch::async, [=] {
+            {
+              json j;
+              j["timestamp"] = current_time;
+              j["robot_qpos"] = obs.robot_qpos;
+              j["gripper_qpos"] = obs.gripper_qpos;
+              for (const auto& [name, image] : obs.images) {
+                cv::Mat resizedImg;
+                cv::resize(image, resizedImg, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+                j[name] = MatToJson(resizedImg);
+              }
+              sock_.send(zmq::buffer(json::to_msgpack(j)));
+            }
+
+            {
+              zmq::message_t msg;
+              auto rv = sock_.recv(msg, zmq::recv_flags::none);
+              std::vector<uint8_t> vec;
+              vec.resize(msg.size());
+              std::memcpy(vec.data(), msg.data(), msg.size());
+              auto j = json::from_msgpack(vec);
+              long timestamp = j.value("timestamp", (long)0);
+              std::vector<IntegratedRobot::Action> actions;
+              for (const auto& arr : j["action"]) {
+                IntegratedRobot::Action act;
+                if (act.actions.size() != arr.size()) {
+                  continue;
+                }
+                for (int i = 0; i < arr.size(); i++) {
+                  act.actions[i] = arr[i].template get<double>();
+                }
+                actions.push_back(act);
+              }
+              return std::make_pair(timestamp, actions);
+            }
+          });
+        }
+
+        int ref_count{0};
+        rb::y1a::IntegratedRobot::Action ref;
+        ref.actions.setZero();
+        while (!que.empty()) {
+          auto item = que.top();
+          if (item.timestamp <= current_time) {
+            ref.actions += item.action.actions;
+            ref_count++;
+          } else {
+            break;
+          }
+          que.pop();
+        }
+
+        if (ref_count > 0) {
+          ref.actions /= ref_count;
+          Eigen::Vector<double, 2 + 6> tmp = action.actions.block<2 + 6, 1>(0, 0);
+          action.actions = lpf_gain * ref.actions + (1 - lpf_gain) * action.actions;
+          action.actions.block<2 + 6, 1>(0, 0) = tmp;
+        }
+
+        std::cout << action.actions.transpose() << std::endl;
       },
-      std::chrono::nanoseconds((long)(1.9 / fps)));
+      std::chrono::nanoseconds((long)(1.e9 / fps)));
+
+  while(true) {
+    std::this_thread::sleep_for(1s);
+  }
 
   return 0;
 }

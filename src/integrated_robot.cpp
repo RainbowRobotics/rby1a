@@ -170,6 +170,13 @@ void IntegratedRobot::Initialize_robot() {
       },
       100 /* (Hz) */);
 
+  robot_dyn_ = robot_->GetDynamics();
+  robot_dyn_state_ =
+      robot_dyn_->MakeState({"base", "link_head_0", "ee_right", "ee_left"}, y1_model::A::kRobotJointNames);
+  robot_dyn_state_->SetGravity({0, 0, 0, 0, 0, -9.81});
+  q_upper_limit_ = robot_dyn_->GetLimitQUpper(robot_dyn_state_);
+  q_lower_limit_ = robot_dyn_->GetLimitQLower(robot_dyn_state_);
+
   robot_->ResetAllParametersToDefault();
   robot_->SetParameter("joint_position_command.cutoff_frequency", "4.0");
   std::cout << "parameter set" << std::endl;
@@ -513,6 +520,14 @@ void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum
     return;
   }
 
+  Eigen::Vector<double, kRobotDOF + kGripperDOF> q_ref = action.actions;
+
+  q_ref(2 + 6 + 7 + 7 + 0) = std::clamp(q_ref(2 + 6 + 7 + 7 + 0), -0.523, 0.523);
+  q_ref(2 + 6 + 7 + 7 + 1) = std::clamp(q_ref(2 + 6 + 7 + 7 + 1), -0.35, 1.57);
+  for (int i = 2; i < 2 + 6 + 7 + 7 + 2; i++) {
+    q_ref(i) = std::clamp(q_ref(i), q_lower_limit_(i), q_upper_limit_(i));
+  }
+
   auto torso_velocity_limit = Eigen::Vector<double, 6>::Constant(160. * M_PI / 180. * 0.9);
   auto torso_acc_limit = Eigen::Vector<double, 6>::Constant(600. * M_PI / 180. * 1.5);
 
@@ -529,7 +544,7 @@ void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum
   if (config_.robot.act_mobility) {
     builder.SetMobilityCommand(JointVelocityCommandBuilder()
                                    .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9 /* Inf */))
-                                   .SetVelocity(action.actions.block<2, 1>(0, 0))
+                                   .SetVelocity(q_ref.block<2, 1>(0, 0))
                                    .SetAccelerationLimit(Eigen::Vector<double, 2>::Constant(0.1)));
   }
   builder
@@ -538,32 +553,32 @@ void IntegratedRobot::Step(const IntegratedRobot::Action& action, double minimum
               .SetTorsoCommand(JointPositionCommandBuilder()
                                    .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9 /* Inf */))
                                    .SetMinimumTime(minimum_time)
-                                   .SetPosition(action.actions.block<6, 1>(2, 0))
+                                   .SetPosition(q_ref.block<6, 1>(2, 0))
                                    .SetVelocityLimit(torso_velocity_limit)
                                    .SetAccelerationLimit(torso_acc_limit))
               .SetRightArmCommand(JointPositionCommandBuilder()
                                       .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9 /* Inf */))
                                       .SetMinimumTime(minimum_time)
-                                      .SetPosition(action.actions.block<7, 1>(2 + 6, 0))
+                                      .SetPosition(q_ref.block<7, 1>(2 + 6, 0))
                                       .SetVelocityLimit(arm_velocity_limit)
                                       .SetAccelerationLimit(arm_acc_limit))
               .SetLeftArmCommand(JointPositionCommandBuilder()
                                      .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9 /* Inf */))
                                      .SetMinimumTime(minimum_time)
-                                     .SetPosition(action.actions.block<7, 1>(2 + 6 + 7, 0))
+                                     .SetPosition(q_ref.block<7, 1>(2 + 6 + 7, 0))
                                      .SetVelocityLimit(arm_velocity_limit)
                                      .SetAccelerationLimit(arm_acc_limit)))
       .SetHeadCommand(JointPositionCommandBuilder()
                           .SetCommandHeader(CommandHeaderBuilder().SetControlHoldTime(1.e9))
                           .SetMinimumTime(minimum_time)
-                          .SetPosition(action.actions.block<2, 1>(2 + 6 + 7 + 7, 0))
+                          .SetPosition(q_ref.block<2, 1>(2 + 6 + 7 + 7, 0))
                           .SetVelocityLimit(head_velocity_limit)
                           .SetAccelerationLimit(head_acc_limit));
 
   robot_command_stream_handler_->SendCommand(RobotCommandBuilder().SetCommand(builder));
   gripper_buf_.PushTask([=] {
     gripper_target_operation_mode.setConstant(DynamixelBus::kCurrentBasedPositionControlMode);
-    gripper_target_position = action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0);
+    gripper_target_position = q_ref.block<2, 1>(2 + 6 + 7 + 7 + 2, 0);
   });
 }
 

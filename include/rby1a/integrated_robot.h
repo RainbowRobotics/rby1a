@@ -116,6 +116,9 @@ class IntegratedRobot {
   ObservationState obs_state;
 
   std::shared_ptr<Robot<Model>> robot_;
+  std::shared_ptr<rb::dyn::Robot<rb::y1_model::A::kRobotDOF>> robot_dyn_;
+  std::shared_ptr<rb::dyn::State<rb::y1_model::A::kRobotDOF>> robot_dyn_state_;
+  Eigen::Vector<double, rb::y1_model::A::kRobotDOF> q_lower_limit_, q_upper_limit_;
   std::unique_ptr<rb::DynamixelBus> gripper_;
 
   std::unique_ptr<RobotCommandStreamHandler<Model>> robot_command_stream_handler_;
