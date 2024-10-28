@@ -193,8 +193,8 @@ void AppMain::InitializeServer() {
         j["storage_available"] = state_.upc_storage_available;
         j["storage_free"] = state_.upc_storage_free;
         j["storage_capacity"] = state_.upc_storage_capacity;
-        zmq::send_multipart(pub_sock_,
-                            std::array<zmq::const_buffer, 2>{zmq::str_buffer("data"), zmq::buffer(j.dump())});
+        zmq::send_multipart(
+            pub_sock_, std::array<zmq::const_buffer, 2>{zmq::str_buffer("data"), zmq::buffer(json::to_msgpack(j))});
 
         static auto last_time = std::chrono::steady_clock::now();
         if (std::chrono::steady_clock::now() - last_time > 500ms) {
@@ -214,8 +214,8 @@ void AppMain::InitializeServer() {
                 image_j[name] = MatToJson(resizedImg);
               }
               publisher_ev_->PushTask([=] {
-                zmq::send_multipart(
-                    pub_sock_, std::array<zmq::const_buffer, 2>{zmq::str_buffer("image"), zmq::buffer(image_j.dump())});
+                zmq::send_multipart(pub_sock_, std::array<zmq::const_buffer, 2>{
+                                                   zmq::str_buffer("image"), zmq::buffer(json::to_msgpack(image_j))});
               });
             });
             last_time = std::chrono::steady_clock::now();
@@ -307,7 +307,7 @@ AppMain::Teleop::~Teleop() {
   app_->record_ev_->DoTask([] {});
 
   loop_.reset();
-  
+
   std::cout << "destructor tele-operation" << std::endl;
 }
 
