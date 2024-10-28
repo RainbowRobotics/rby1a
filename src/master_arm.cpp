@@ -2,6 +2,8 @@
 
 #include "toml++/toml.hpp"
 
+using namespace std::chrono_literals;
+
 namespace {
 std::string ReadFileToString(const std::string& filePath) {
   std::ifstream file(filePath);
@@ -83,6 +85,7 @@ void MasterArm::Initialize(const MasterArm::Config& config) {
       throw std::runtime_error("failed to power on");
     }
   }
+  std::this_thread::sleep_for(500ms);
 
   /********************************
    * Master Arm
