@@ -323,7 +323,11 @@
              </widget>
             </item>
             <item row="1" column="1" colspan="2">
-             <widget class="QLineEdit" name="LE_EpisodeName"/>
+             <widget class="QLineEdit" name="LE_EpisodeName">
+              <property name="text">
+               <string>episode</string>
+              </property>
+             </widget>
             </item>
             <item row="1" column="0">
              <widget class="QLabel" name="label_10">
@@ -333,7 +337,11 @@
              </widget>
             </item>
             <item row="2" column="1">
-             <widget class="QLineEdit" name="LE_EpisodeNumber"/>
+             <widget class="QLineEdit" name="LE_EpisodeNumber">
+              <property name="text">
+               <string>0</string>
+              </property>
+             </widget>
             </item>
             <item row="0" column="0" colspan="3">
              <widget class="QLabel" name="label_12">

@@ -148,6 +148,8 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
         self.PB_StopRecordingInvalid.clicked.connect(self.stop_recording_invalid)
         self.PB_Close.clicked.connect(self.close)
 
+        self.showFullScreen()
+
     def setup_zmq(self):
         self.ctx = zmq.Context.instance()
 
@@ -218,9 +220,9 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.PB_StartRecording.setEnabled(
                         data["teleop"] and data["recording_ready"] and (not data["recording"]))
                     self.PB_StopRecordingValid.setEnabled(
-                        data["teleop"] and data["recording_ready"] and data["recording"])
+                        data["teleop"] and data["recording"])
                     self.PB_StopRecordingInvalid.setEnabled(
-                        data["teleop"] and data["recording_ready"] and data["recording"])
+                        data["teleop"] and data["recording"])
 
                 if topic == b"image":
                     data = json.loads(msg)

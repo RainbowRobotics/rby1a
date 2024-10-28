@@ -436,7 +436,9 @@ class Ui_MainWindow(object):
         self.label_9.setText(QCoreApplication.translate("MainWindow", u"Capacity", None))
         self.label_11.setText(QCoreApplication.translate("MainWindow", u"#", None))
         self.PB_ResetEpisodeNumber.setText(QCoreApplication.translate("MainWindow", u"Reset", None))
+        self.LE_EpisodeName.setText(QCoreApplication.translate("MainWindow", u"episode", None))
         self.label_10.setText(QCoreApplication.translate("MainWindow", u"Name", None))
+        self.LE_EpisodeNumber.setText(QCoreApplication.translate("MainWindow", u"0", None))
         self.label_12.setText(QCoreApplication.translate("MainWindow", u"Episode", None))
         self.PB_Close.setText(QCoreApplication.translate("MainWindow", u"Close", None))
         self.PB_StartRecording.setText(QCoreApplication.translate("MainWindow", u"Start\n"
