@@ -11,7 +11,7 @@ ft = true # ft
 
 
 [gripper]
-dev_name = "/dev/rby1-gripper"
+dev_name = "/dev/rby1_gripper"
 #dev_name = "/dev/ttyUSB0"
 
 
