@@ -13,7 +13,6 @@ void signal_handler(int signum) {
   }
 
   _exit(EXIT_FAILURE);
-  _exit(128 + signum);
   signal(SIGTERM, SIG_DFL);
   raise(SIGTERM);
 }
