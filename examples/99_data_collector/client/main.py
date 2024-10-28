@@ -215,57 +215,66 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.PB_Ready.setEnabled(data["servo_on"])
                     self.PB_StartTeleoperation.setEnabled((not data["recording"]) and (not data["teleop"]))
                     self.PB_StopTeleoperation.setEnabled((not data["recording"]) and data["teleop"])
-                    self.PB_StartRecording.setEnabled(data["teleop"] and (not data["recording"]))
-                    self.PB_StopRecordingValid.setEnabled(data["teleop"] and data["recording"])
-                    self.PB_StopRecordingInvalid.setEnabled(data["teleop"] and data["recording"])
+                    self.PB_StartRecording.setEnabled(
+                        data["teleop"] and data["recording_ready"] and (not data["recording"]))
+                    self.PB_StopRecordingValid.setEnabled(
+                        data["teleop"] and data["recording_ready"] and data["recording"])
+                    self.PB_StopRecordingInvalid.setEnabled(
+                        data["teleop"] and data["recording_ready"] and data["recording"])
 
                 if topic == b"image":
                     data = json.loads(msg)
 
-                    image = json_to_mat(data["cam0_rgb"])
-                    pixmap = mat_to_pixmap(image)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam0RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam0RGB.setPixmap(scaled_pixmap)
+                    if "cam0_rgb" in data:
+                        image = json_to_mat(data["cam0_rgb"])
+                        pixmap = mat_to_pixmap(image)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam0RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam0RGB.setPixmap(scaled_pixmap)
 
-                    image = json_to_mat(data["cam1_rgb"])
-                    pixmap = mat_to_pixmap(image)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam1RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam1RGB.setPixmap(scaled_pixmap)
+                    if "cam1_rgb" in data:
+                        image = json_to_mat(data["cam1_rgb"])
+                        pixmap = mat_to_pixmap(image)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam1RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam1RGB.setPixmap(scaled_pixmap)
 
-                    image = json_to_mat(data["cam2_rgb"])
-                    pixmap = mat_to_pixmap(image)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam2RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam2RGB.setPixmap(scaled_pixmap)
+                    if "cam2_rgb" in data:
+                        image = json_to_mat(data["cam2_rgb"])
+                        pixmap = mat_to_pixmap(image)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam2RGB.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam2RGB.setPixmap(scaled_pixmap)
 
-                    depth = json_to_mat(data["cam0_depth"])
-                    depth = depth.astype(np.float32) / 1000.  # milli-meter to meter
-                    depth = cv2.normalize(np.clip(depth, 0, 5), None, 0., 255., cv2.NORM_MINMAX)
-                    image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
-                    pixmap = mat_to_pixmap(image, False)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam0Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam0Depth.setPixmap(scaled_pixmap)
+                    if "cam0_depth" in data:
+                        depth = json_to_mat(data["cam0_depth"])
+                        depth = depth.astype(np.float32) / 1000.  # milli-meter to meter
+                        depth = cv2.normalize(np.clip(depth, 0, 5), None, 0., 255., cv2.NORM_MINMAX)
+                        image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
+                        pixmap = mat_to_pixmap(image, False)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam0Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam0Depth.setPixmap(scaled_pixmap)
 
-                    depth = json_to_mat(data["cam1_depth"])
-                    depth = depth.astype(np.float32) / 1000.
-                    depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
-                    image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
-                    pixmap = mat_to_pixmap(image, False)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam1Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam1Depth.setPixmap(scaled_pixmap)
+                    if "cam1_depth" in data:
+                        depth = json_to_mat(data["cam1_depth"])
+                        depth = depth.astype(np.float32) / 1000.
+                        depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
+                        image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
+                        pixmap = mat_to_pixmap(image, False)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam1Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam1Depth.setPixmap(scaled_pixmap)
 
-                    depth = json_to_mat(data["cam2_depth"])
-                    depth = depth.astype(np.float32) / 1000.
-                    depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
-                    image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
-                    pixmap = mat_to_pixmap(image, False)
-                    scaled_pixmap = pixmap.scaled(self.L_Cam2Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                  Qt.TransformationMode.SmoothTransformation)
-                    self.L_Cam2Depth.setPixmap(scaled_pixmap)
+                    if "cam2_depth" in data:
+                        depth = json_to_mat(data["cam2_depth"])
+                        depth = depth.astype(np.float32) / 1000.
+                        depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
+                        image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
+                        pixmap = mat_to_pixmap(image, False)
+                        scaled_pixmap = pixmap.scaled(self.L_Cam2Depth.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation)
+                        self.L_Cam2Depth.setPixmap(scaled_pixmap)
 
             flags = self.sub.getsockopt(zmq.EVENTS)
 

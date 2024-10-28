@@ -122,32 +122,11 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.line_2)
 
-        self.PB_ResetMaster = QPushButton(self.frame)
-        self.PB_ResetMaster.setObjectName(u"PB_ResetMaster")
+        self.PB_Zero = QPushButton(self.frame)
+        self.PB_Zero.setObjectName(u"PB_Zero")
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.PB_ResetMaster.sizePolicy().hasHeightForWidth())
-        self.PB_ResetMaster.setSizePolicy(sizePolicy)
-
-        self.verticalLayout.addWidget(self.PB_ResetMaster)
-
-        self.PB_ResetSlave = QPushButton(self.frame)
-        self.PB_ResetSlave.setObjectName(u"PB_ResetSlave")
-        sizePolicy.setHeightForWidth(self.PB_ResetSlave.sizePolicy().hasHeightForWidth())
-        self.PB_ResetSlave.setSizePolicy(sizePolicy)
-
-        self.verticalLayout.addWidget(self.PB_ResetSlave)
-
-        self.line = QFrame(self.frame)
-        self.line.setObjectName(u"line")
-        self.line.setFrameShape(QFrame.Shape.HLine)
-        self.line.setFrameShadow(QFrame.Shadow.Sunken)
-
-        self.verticalLayout.addWidget(self.line)
-
-        self.PB_Zero = QPushButton(self.frame)
-        self.PB_Zero.setObjectName(u"PB_Zero")
         sizePolicy.setHeightForWidth(self.PB_Zero.sizePolicy().hasHeightForWidth())
         self.PB_Zero.setSizePolicy(sizePolicy)
 
@@ -447,8 +426,6 @@ class Ui_MainWindow(object):
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Servo On", None))
         self.label.setText(QCoreApplication.translate("MainWindow", u"12v (Master Arm)", None))
         self.label_13.setText(QCoreApplication.translate("MainWindow", u"Tele-operation", None))
-        self.PB_ResetMaster.setText(QCoreApplication.translate("MainWindow", u"Reset Master (MasterArm)", None))
-        self.PB_ResetSlave.setText(QCoreApplication.translate("MainWindow", u"Reset Slave (Robot)", None))
         self.PB_Zero.setText(QCoreApplication.translate("MainWindow", u"Zero", None))
         self.PB_Ready.setText(QCoreApplication.translate("MainWindow", u"Ready", None))
         self.PB_StartTeleoperation.setText(QCoreApplication.translate("MainWindow", u"Start Teleoperation", None))

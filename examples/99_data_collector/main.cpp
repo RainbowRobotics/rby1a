@@ -28,7 +28,10 @@ int main(int argc, char** argv) {
   std::string config_file{argv[1]};
 
   app = std::make_unique<AppMain>(config_file);
-  app->Wait();
+
+  while (true) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
 
   std::cout << "Finished" << std::endl;
 

@@ -344,7 +344,7 @@ void IntegratedRobot::Initialize_gripper() {
         auto current_time = std::chrono::steady_clock::now();
         observation_buf_.PushTask([=] {
           obs_state.gripper_updated_time = current_time;
-          obs.gripper_qpos = q;
+          obs.gripper_qpos = (q.array() - gripper_min.array()) / (gripper_max.array() - gripper_min.array());
           obs.gripper_qvel = qvel;
           if (config_.robot.obs_torque) {
             obs.gripper_torque = torque;

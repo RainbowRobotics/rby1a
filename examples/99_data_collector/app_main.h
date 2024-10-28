@@ -17,8 +17,6 @@
 
 class AppMain {
  public:
-  const std::string kCommandResetMaster = "reset_master";
-  const std::string kCommandResetSlave = "reset_slave";
   const std::string kCommandZeroPose = "zero_pose";
   const std::string kCommandReadyPose = "ready_pose";
   const std::string kCommandStartTeleop = "start_teleop";
@@ -56,6 +54,7 @@ class AppMain {
 
     bool teleop{false};
 
+    bool recording_ready{false};
     bool recording{false};
     int recording_count{0};
 
@@ -85,11 +84,9 @@ class AppMain {
 
   ~AppMain();
 
-  void Wait();
-
   void StartRecording(const std::string& file_path);
 
-  std::future<void> StopRecording(bool valid = true);
+  void StopRecording(bool valid = true);
 
   void Record(const rb::y1a::IntegratedRobot::Observation& observation, const rb::y1a::IntegratedRobot::Action& action);
 
@@ -119,7 +116,7 @@ class AppMain {
   std::unique_ptr<rb::EventLoop> service_ev_;
   std::unique_ptr<rb::EventLoop> record_ev_;
   int record_data_count_ = 0;
-  std::atomic<bool> recording_ready_{true};
+  std::mutex record_mtx_;
 
   State state_;
 
