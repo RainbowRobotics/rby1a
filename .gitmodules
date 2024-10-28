@@ -1,11 +1,11 @@
 [submodule "third-party/tomlplusplus"]
 	path = third-party/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
-[submodule "examples/99_data_collector/third-party/libzmq"]
-	path = examples/99_data_collector/third-party/libzmq
+[submodule "examples/third-party/libzmq"]
+	path = examples/third-party/libzmq
 	url = https://github.com/zeromq/libzmq.git
-[submodule "examples/99_data_collector/third-party/cppzmq"]
-	path = examples/99_data_collector/third-party/cppzmq
+[submodule "examples/third-party/cppzmq"]
+	path = examples/third-party/cppzmq
 	url = https://github.com/zeromq/cppzmq.git
 [submodule "examples/99_data_collector/third-party/json"]
 	path = examples/99_data_collector/third-party/json
