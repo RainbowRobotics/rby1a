@@ -1,0 +1,27 @@
+[robot]
+address = "192.168.100.26:50051"
+
+[robot.action]
+mobility = false
+
+[robot.observation]
+# qpos, qvel
+torque = true # torque
+ft = true # ft
+
+
+[gripper]
+dev_name = "/dev/rby1_gripper"
+#dev_name = "/dev/ttyUSB0"
+
+
+[camera]
+# Only realsense supported
+height = 240
+width = 424
+fps = 60
+sensors = [# Camera needs to support both RGB and Depth
+    { name = "cam0", serial = "233522071632" },
+    { name = "cam1", serial = "218622270382" },
+    { name = "cam2", serial = "128422271273" }
+]
