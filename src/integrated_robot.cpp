@@ -4,6 +4,8 @@
 #include "rby1a/integrated_robot.h"
 #include "toml++/toml.hpp"
 
+using namespace std::chrono_literals;
+
 namespace {
 rs2::context rs_ctx;
 
@@ -134,17 +136,20 @@ void IntegratedRobot::Initialize_robot() {
       throw std::runtime_error("failed to power on");
     }
   }
+  std::this_thread::sleep_for(500ms);
   std::cout << "power on" << std::endl;
   if (!robot_->IsServoOn(".*")) {
     if (!robot_->ServoOn(".*")) {
       throw std::runtime_error("failed to servo on");
     }
   }
+  std::this_thread::sleep_for(500ms);
   std::cout << "servo on" << std::endl;
   robot_->ResetFaultControlManager();
   if (!robot_->EnableControlManager()) {
     throw std::runtime_error("failed to enable control manager");
   }
+  std::this_thread::sleep_for(500ms);
   std::cout << "control manager enabled" << std::endl;
   robot_->StartStateUpdate(
       [=](const RobotState<Model>& rs) {
