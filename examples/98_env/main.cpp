@@ -19,6 +19,7 @@ zmq::socket_t sock_;
 
 struct TimedAction {
   long timestamp{0};
+  double weight;
   IntegratedRobot::Action action;
 };
 
@@ -44,7 +45,7 @@ int main(int argc, char** argv) {
 
   while (true) {
     char c;
-    std::cout << "Do you want to start? (y/n/z)" << std::endl;
+    std::cout << "Do you want to start? (y/n/z/r)" << std::endl;
     std::cin >> c;
     if (c == 'y') {
       break;
@@ -54,32 +55,22 @@ int main(int argc, char** argv) {
       action.actions.setZero();
       robot.Step(action, 5);
     }
-  }
-
-  while (true) {
-    char c;
-    std::cout << "Go to ready pose? (y/n)" << std::endl;
-    std::cin >> c;
-    if (c == 'y') {
-      break;
+    if (c == 'r') {
+      auto obs = robot.GetObservation();
+      IntegratedRobot::Action action;
+      action.actions.block<2, 1>(0, 0).setZero();                  // Mobility
+      action.actions.block<20, 1>(2, 0) << 0, 40, -70, 30, 0, 0,   // Torso
+          -30, -10, 0, -100, 0, 40, 0,                             // Right
+          -30, 10, 0, -100, 0, 40, 0;                              // Left
+      action.actions.block<2, 1>(2 + 20, 0) << 0, 0.8;             // Head
+      action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0).setZero();  // Gripper
+      action.actions *= M_PI / 180.;
+      robot.Step(action, 5);
     }
   }
 
-  {
-    auto obs = robot.GetObservation();
-    IntegratedRobot::Action action;
-    action.actions.block<2, 1>(0, 0).setZero();                  // Mobility
-    action.actions.block<20, 1>(2, 0) << 0, 40, -70, 30, 0, 0,   // Torso
-        -30, -10, 0, -100, 0, 40, 0,                             // Right
-        -30, 10, 0, -100, 0, 40, 0;                              // Left
-    action.actions.block<2, 1>(2 + 20, 0) << 0, 0;               // Head
-    action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0).setZero();  // Gripper
-    action.actions *= M_PI / 180.;
-    robot.Step(action, 5);
-  }
-
-  for(int i = 0; i < 6; i++) {
-    std::cout << ".";
+  for (int i = 0; i < 6; i++) {
+    std::cout << 6 - i << " ";
     std::flush(std::cout);
     std::this_thread::sleep_for(1s);
   }
@@ -109,7 +100,7 @@ int main(int argc, char** argv) {
   auto fps = 50.;
   auto dt = 1. / fps;
   auto dt_micro = (long)(dt * 1e6);
-  auto lpf_gain = 0.2;
+  auto lpf_gain = 0.1;
   loop.PushCyclicTask(
       [&] {
         auto obs = robot.GetObservation();
@@ -127,6 +118,7 @@ int main(int argc, char** argv) {
             for (int i = 0; i < inference_result.second.size(); i++) {
               TimedAction ta;
               ta.timestamp = start + dt_micro * (i + 1);
+              ta.weight = (double)(inference_result.second.size() - i) / (double)inference_result.second.size();
               ta.action = inference_result.second[i];
               if (ta.timestamp >= current_time) {
                 que.push(ta);
@@ -173,32 +165,37 @@ int main(int argc, char** argv) {
           });
         }
 
-        int ref_count{0};
+        double weight_sum{0};
         rb::y1a::IntegratedRobot::Action ref;
         ref.actions.setZero();
         while (!que.empty()) {
           auto item = que.top();
           if (item.timestamp <= current_time) {
-            ref.actions += item.action.actions;
-            ref_count++;
+            ref.actions += item.weight * item.action.actions;
+            weight_sum += item.weight;
           } else {
             break;
           }
           que.pop();
         }
 
-        if (ref_count > 0) {
-          ref.actions /= ref_count;
+        if (weight_sum > 0) {
+          ref.actions /= weight_sum;
+
+          ref.actions(2 + 6 + 7 + 7 + 2 + 0) = (ref.actions(2 + 6 + 7 + 7 + 2 + 0) - 3.98988) / (13.522 - 3.98988);
+          ref.actions(2 + 6 + 7 + 7 + 2 + 1) = (ref.actions(2 + 6 + 7 + 7 + 2 + 1) - 5.59596) / (15.1726 - 5.59596);
+
           Eigen::Vector<double, 2 + 6> tmp = action.actions.block<2 + 6, 1>(0, 0);
           action.actions = lpf_gain * ref.actions + (1 - lpf_gain) * action.actions;
+          action.actions.tail<2>() = ref.actions.tail<2>();
           action.actions.block<2 + 6, 1>(0, 0) = tmp;
         }
 
-        std::cout << action.actions.transpose() << std::endl;
+        robot.Step(action, 1. / fps * 1.01);
       },
       std::chrono::nanoseconds((long)(1.e9 / fps)));
 
-  while(true) {
+  while (true) {
     std::this_thread::sleep_for(1s);
   }
 

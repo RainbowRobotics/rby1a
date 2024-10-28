@@ -100,8 +100,8 @@ class AppMain {
   std::unique_ptr<Teleop> teleop_;
 
   std::shared_ptr<rb::Robot<rb::y1_model::A>> robot_;
-  std::unique_ptr<rb::y1a::MasterArm> master_;
-  std::unique_ptr<rb::y1a::IntegratedRobot> slave_;
+  std::shared_ptr<rb::y1a::MasterArm> master_;
+  std::shared_ptr<rb::y1a::IntegratedRobot> slave_;
 
   std::shared_ptr<rb::dyn::Robot<rb::y1_model::A::kRobotDOF>> robot_dyn_;
   std::shared_ptr<rb::dyn::State<rb::y1_model::A::kRobotDOF>> robot_dyn_state_;
@@ -117,6 +117,7 @@ class AppMain {
   std::unique_ptr<rb::EventLoop> record_ev_;
   int record_data_count_ = 0;
   std::mutex record_mtx_;
+  std::future<void> image_future;
 
   State state_;
 

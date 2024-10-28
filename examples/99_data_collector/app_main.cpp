@@ -39,12 +39,13 @@ AppMain::AppMain(const std::string& config_file) {
 AppMain::~AppMain() {
   teleop_.reset();
 
-  std::cout << "publisher_ev reset ... ";
-  publisher_ev_.reset();
-  std::cout << " - finished" << std::endl;
-
   std::cout << "service_ev reset ... ";
   service_ev_.reset();
+  std::cout << " - finished" << std::endl;
+
+  std::cout << "publisher_ev reset ... ";
+  publisher_ev_.reset();
+  image_future.get();
   std::cout << " - finished" << std::endl;
 
   std::cout << "record_ev reset ... ";
@@ -53,17 +54,17 @@ AppMain::~AppMain() {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-  std::cout << "slave ..." << std::endl;
-  if (slave_) {
-    slave_.reset();
-  }
-  std::cout << "slave ... - deleted" << std::endl;
+  // std::cout << "slave ..." << std::endl;
+  // if (slave_) {
+  //   slave_.reset();
+  // }
+  // std::cout << "slave ... - deleted" << std::endl;
 
-  std::cout << "master ..." << std::endl;
-  if (master_) {
-    master_.reset();
-  }
-  std::cout << "master ... - deleted" << std::endl;
+  // std::cout << "master ..." << std::endl;
+  // if (master_) {
+  //   master_.reset();
+  // }
+  // std::cout << "master ... - deleted" << std::endl;
 
   std::cout << "state_buf reset ... ";
   state_buf_.reset();
@@ -83,11 +84,11 @@ void AppMain::Initialize(const Config& config) {
 
   //
 
-  master_ = std::make_unique<y1a::MasterArm>(config_.master_config);
+  master_ = std::make_shared<y1a::MasterArm>(config_.master_config);
 
   std::cout << "Master Arm Initialized" << std::endl;
 
-  slave_ = std::make_unique<y1a::IntegratedRobot>(config_.slave_config);
+  slave_ = std::make_shared<y1a::IntegratedRobot>(config_.slave_config);
   if (!slave_->WaitUntilReady(15s)) {
     std::cout << "error" << std::endl;
     slave_.reset();
@@ -198,7 +199,6 @@ void AppMain::InitializeServer() {
 
         static auto last_time = std::chrono::steady_clock::now();
         if (std::chrono::steady_clock::now() - last_time > 500ms) {
-          static std::future<void> image_future;
           bool done = true;
           if (image_future.valid()) {
             if (image_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {

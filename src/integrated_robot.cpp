@@ -171,8 +171,10 @@ void IntegratedRobot::Initialize_robot() {
       100 /* (Hz) */);
 
   robot_dyn_ = robot_->GetDynamics();
+  std::cout << "get model from robot" << std::endl;
   robot_dyn_state_ =
       robot_dyn_->MakeState({"base", "link_head_0", "ee_right", "ee_left"}, y1_model::A::kRobotJointNames);
+  std::cout << "robot state is made" << std::endl;
   robot_dyn_state_->SetGravity({0, 0, 0, 0, 0, -9.81});
   q_upper_limit_ = robot_dyn_->GetLimitQUpper(robot_dyn_state_);
   q_lower_limit_ = robot_dyn_->GetLimitQLower(robot_dyn_state_);
@@ -181,7 +183,7 @@ void IntegratedRobot::Initialize_robot() {
   robot_->SetParameter("joint_position_command.cutoff_frequency", "4.0");
   std::cout << "parameter set" << std::endl;
 
-  auto state = robot_->GetState();
+  // auto state = robot_->GetState();
   robot_command_stream_handler_ = robot_->CreateCommandStream();
 
   std::cout << "robot initialization finished" << std::endl;
