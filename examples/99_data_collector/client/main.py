@@ -135,7 +135,7 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
         self.LE_EpisodeNumber.setValidator(QIntValidator(bottom=0, parent=self))
         self.timer = QTimer()
         self.timer.timeout.connect(self.timer_timeout)
-        self.timer.setInterval(100)
+        self.timer.setInterval(500)
         self.timer.start()
 
         self.PB_Zero.clicked.connect(self.zero)
@@ -241,7 +241,7 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.L_Cam2RGB.setPixmap(scaled_pixmap)
 
                     depth = json_to_mat(data["cam0_depth"])
-                    depth /= 1000.  # milli-meter to meter
+                    depth = depth.astype(np.float32) / 1000.  # milli-meter to meter
                     depth = cv2.normalize(np.clip(depth, 0, 5), None, 0., 255., cv2.NORM_MINMAX)
                     image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
                     pixmap = mat_to_pixmap(image, False)
@@ -250,7 +250,7 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.L_Cam0Depth.setPixmap(scaled_pixmap)
 
                     depth = json_to_mat(data["cam1_depth"])
-                    depth /= 1000.  # milli-meter to meter
+                    depth = depth.astype(np.float32) / 1000.
                     depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
                     image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
                     pixmap = mat_to_pixmap(image, False)
@@ -259,7 +259,7 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                     self.L_Cam1Depth.setPixmap(scaled_pixmap)
 
                     depth = json_to_mat(data["cam2_depth"])
-                    depth /= 1000.  # milli-meter to meter
+                    depth = depth.astype(np.float32) / 1000.
                     depth = cv2.normalize(np.clip(depth, 0, 0.7), None, 0, 255, cv2.NORM_MINMAX)
                     image = cv2.applyColorMap(depth.astype(np.uint8), cv2.COLORMAP_JET)
                     pixmap = mat_to_pixmap(image, False)
