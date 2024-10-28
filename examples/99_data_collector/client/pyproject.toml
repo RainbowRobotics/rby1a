@@ -12,6 +12,7 @@ pyside6 = "^6.8.0.2"
 zmq = "^0.0.0"
 numpy = "^2.1.2"
 opencv-python = "^4.10.0.84"
+msgpack = "^1.1.0"
 
 
 [build-system]

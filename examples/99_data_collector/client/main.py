@@ -5,6 +5,7 @@ import zmq
 import numpy as np
 import cv2
 import json
+import msgpack
 
 from ui_form import Ui_MainWindow
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QMainWindow, QApplication, QMessageBox, \
@@ -199,7 +200,8 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                 [topic, msg] = self.sub.recv_multipart()
 
                 if topic == b"data":
-                    data = json.loads(msg)
+                    data = msgpack.unpackb(msg, raw=False)
+                    # data = json.loads(msg)
 
                     self.set_background_color(self.LE_12v, COLOR_GREEN if data["power_12v"] else COLOR_RED)
                     self.set_background_color(self.LE_48v, COLOR_GREEN if data["power_48v"] else COLOR_RED)
@@ -225,7 +227,8 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
                         data["teleop"] and data["recording"])
 
                 if topic == b"image":
-                    data = json.loads(msg)
+                    data = msgpack.unpackb(msg, raw=False)
+                    # data = json.loads(msg)
 
                     if "cam0_rgb" in data:
                         image = json_to_mat(data["cam0_rgb"])
