@@ -79,13 +79,9 @@ IntegratedRobot::IntegratedRobot(const std::string& config_file)
 
 IntegratedRobot::~IntegratedRobot() {
   camera_loop_.reset();
+  std::cout << "reset camera loop" << std::endl;
 
-  if (gripper_loop_) {
-    gripper_loop_->Stop();
-    gripper_loop_->WaitForTasks();
-    gripper_loop_->PurgeTasks();
-    gripper_loop_.reset();
-  }
+  gripper_loop_.reset();
   std::cout << "reset gripper loop" << std::endl;
 
   if (robot_command_stream_handler_) {
@@ -138,15 +134,18 @@ void IntegratedRobot::Initialize_robot() {
       throw std::runtime_error("failed to power on");
     }
   }
+  std::cout << "power on" << std::endl;
   if (!robot_->IsServoOn(".*")) {
     if (!robot_->ServoOn(".*")) {
       throw std::runtime_error("failed to servo on");
     }
   }
+  std::cout << "servo on" << std::endl;
   robot_->ResetFaultControlManager();
   if (!robot_->EnableControlManager()) {
     throw std::runtime_error("failed to enable control manager");
   }
+  std::cout << "control manager enabled" << std::endl;
   robot_->StartStateUpdate(
       [=](const RobotState<Model>& rs) {
         gripper_power_state_.store(rs.tool_flange_left.output_voltage == 12 &&
@@ -173,9 +172,12 @@ void IntegratedRobot::Initialize_robot() {
 
   robot_->ResetAllParametersToDefault();
   robot_->SetParameter("joint_position_command.cutoff_frequency", "4.0");
+  std::cout << "parameter set" << std::endl;
 
   auto state = robot_->GetState();
   robot_command_stream_handler_ = robot_->CreateCommandStream();
+
+  std::cout << "robot initialization finished" << std::endl;
 }
 
 void IntegratedRobot::Initialize_gripper() {

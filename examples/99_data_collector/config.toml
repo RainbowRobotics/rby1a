@@ -43,7 +43,7 @@ sensors = [
 
 [record]
 fps = 50 # (Hz)
-path = "./"
+path = "/media/nvidia/e1d056ab-9417-421c-b3cf-1923cfc1b9a9/"
 
 
 [server]

@@ -37,10 +37,7 @@ AppMain::AppMain(const std::string& config_file) {
 }
 
 AppMain::~AppMain() {
-  robot_.reset();
-
-  StopRecording();
-  record_ev_->DoTask([] {});
+  teleop_.reset();
 
   std::cout << "publisher_ev reset ... ";
   publisher_ev_.reset();
@@ -56,15 +53,17 @@ AppMain::~AppMain() {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
+  std::cout << "slave ..." << std::endl;
   if (slave_) {
     slave_.reset();
-    std::cout << "slave deleted" << std::endl;
   }
+  std::cout << "slave ... - deleted" << std::endl;
 
+  std::cout << "master ..." << std::endl;
   if (master_) {
     master_.reset();
-    std::cout << "master deleted" << std::endl;
   }
+  std::cout << "master ... - deleted" << std::endl;
 
   std::cout << "state_buf reset ... ";
   state_buf_.reset();
@@ -92,6 +91,8 @@ void AppMain::Initialize(const Config& config) {
   if (!slave_->WaitUntilReady(15s)) {
     std::cout << "error" << std::endl;
     slave_.reset();
+    master_.reset();
+    exit(1);
   }
   state_.recording_ready = true;
 
@@ -289,7 +290,7 @@ void AppMain::InitializeServer() {
 AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
   app_->state_.teleop = true;
 
-  std::cout << "Construct tele-operation" << std::endl;
+  std::cout << "constructor tele-operation" << std::endl;
 
   auto slave_obs = app_->slave_->GetObservation();
   qpos_ref_ = slave_obs.robot_qpos;
@@ -305,7 +306,9 @@ AppMain::Teleop::~Teleop() {
   app_->StopRecording();
   app_->record_ev_->DoTask([] {});
 
-  std::cout << "Destruct tele-operation" << std::endl;
+  loop_.reset();
+  
+  std::cout << "destructor tele-operation" << std::endl;
 }
 
 void AppMain::Teleop::loop() {
@@ -350,23 +353,18 @@ void AppMain::Teleop::loop() {
       Eigen::Vector2d{master_state.button_right.trigger, master_state.button_left.trigger} / 1000.;
   app_->slave_->Step(action, 1 / app_->config_.record.fps * 1.05);
 
-  if (app_->state_.recording) {
-    app_->Record(slave_obs, action);
-    app_->record_data_count_++;
-    if (app_->record_data_count_ % 100 == 0) {
-      std::cout << app_->state_.recording_count << " / " << app_->record_data_count_ << std::endl;
-    }
-  }
+  app_->Record(slave_obs, action);
 }
 
 void AppMain::StartRecording(const std::string& file_path) {
   std::unique_lock<std::mutex> lock(record_mtx_);
-  if (state_.recording || state_.recording_ready) {
+  if (state_.recording || !state_.recording_ready) {
     return;
   }
-  state_.recording_ready = true;
+  state_.recording_ready = false;
   state_.recording = true;
   state_.recording_count = 0;
+  record_data_count_ = 0;
 
   record_ev_->PushTask([=] {
     const int kCompressionLevel = 0;
@@ -423,8 +421,10 @@ void AppMain::StopRecording(bool valid) {
     record_file_.reset();
     record_file_ = nullptr;
 
+    std::cout << "Count: " << state_.recording_count << std::endl;
+
     std::unique_lock<std::mutex> lock(record_mtx_);
-    state_.recording_ready = false;
+    state_.recording_ready = true;
   });
 }
 
@@ -435,6 +435,10 @@ void AppMain::Record(const rb::y1a::IntegratedRobot::Observation& observation,
   std::unique_lock<std::mutex> lock(record_mtx_);
   if (!state_.recording) {
     return;
+  }
+  record_data_count_++;
+  if (record_data_count_ % 100 == 0) {
+    std::cout << state_.recording_count << " / " << record_data_count_ << std::endl;
   }
 
   record_ev_->PushTask([obs = observation, act = action, this] {
