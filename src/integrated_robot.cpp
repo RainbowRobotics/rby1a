@@ -5,6 +5,8 @@
 #include "toml++/toml.hpp"
 
 namespace {
+rs2::context rs_ctx;
+
 std::string ReadFileToString(const std::string& filePath) {
   std::ifstream file(filePath);
   if (!file.is_open()) {
@@ -76,7 +78,14 @@ IntegratedRobot::IntegratedRobot(const std::string& config_file)
     : IntegratedRobot(ParseConfig(ReadFileToString(config_file))) {}
 
 IntegratedRobot::~IntegratedRobot() {
-  gripper_loop_.reset();
+  camera_loop_.reset();
+
+  if (gripper_loop_) {
+    gripper_loop_->Stop();
+    gripper_loop_->WaitForTasks();
+    gripper_loop_->PurgeTasks();
+    gripper_loop_.reset();
+  }
   std::cout << "reset gripper loop" << std::endl;
 
   if (robot_command_stream_handler_) {
@@ -91,7 +100,9 @@ IntegratedRobot::~IntegratedRobot() {
   std::cout << "disable control manager" << std::endl;
   robot_->DisableControlManager();
 
-  std::cout << "exit" << std::endl;
+  gripper_.reset();
+  robot_.reset();
+
   //  robot_->PowerOff("48v");
 }
 
@@ -119,15 +130,14 @@ void IntegratedRobot::Initialize_robot() {
   if (!robot_->Connect(1 /* iteration */, 1000 /* (ms) */)) {
     throw std::runtime_error("failed to connect robot");
   }
+  std::cout << "robot connected ..." << std::endl;
+
   // power on & enable control manager
   if (!robot_->IsPowerOn("48v")) {
     if (!robot_->PowerOn("48v")) {
       throw std::runtime_error("failed to power on");
     }
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  robot_->SetToolFlangeOutputVoltage("left", 12);
-  robot_->SetToolFlangeOutputVoltage("right", 12);
   if (!robot_->IsServoOn(".*")) {
     if (!robot_->ServoOn(".*")) {
       throw std::runtime_error("failed to servo on");
@@ -192,6 +202,10 @@ void IntegratedRobot::Initialize_gripper() {
   gripper_loop_ = std::make_unique<EventLoop>();
   gripper_loop_->PushCyclicTask(
       [=] {
+        if (!gripper_) {
+          return;
+        }
+
         using namespace std::chrono;
         using namespace std::chrono_literals;
 
@@ -205,6 +219,11 @@ void IntegratedRobot::Initialize_gripper() {
         static Eigen::Vector<double, kGripperDOF> target_torque;
         static Eigen::Vector<double, kGripperDOF> target_position;
         static Eigen::Vector<double, kGripperDOF> prev_target_position{Eigen::Vector<double, kGripperDOF>::Zero()};
+
+        if (robot_) {
+          robot_->SetToolFlangeOutputVoltage("left", 12);
+          robot_->SetToolFlangeOutputVoltage("right", 12);
+        }
 
         if (!gripper_power_state_.load()) {
           gripper_state_ = 0;
@@ -254,6 +273,7 @@ void IntegratedRobot::Initialize_gripper() {
             target_operation_mode.setConstant(DynamixelBus::kCurrentControlMode);
             target_torque.setConstant(0);
             gripper_state_++;
+            std::cout << "gripper is on" << std::endl;
             break;
           }
           default: {

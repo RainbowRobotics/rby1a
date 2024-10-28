@@ -75,7 +75,7 @@ class AppMain {
    private:
     AppMain* app_;
 
-    rb::EventLoop loop_;
+    std::unique_ptr<rb::EventLoop> loop_;
     Eigen::Vector<double, rb::y1_model::A::kRobotDOF> qpos_ref_;
     double right_ratio_{0};
     double left_ratio_{0};
@@ -89,7 +89,7 @@ class AppMain {
 
   void StartRecording(const std::string& file_path);
 
-  void StopRecording(bool valid = true);
+  std::future<void> StopRecording(bool valid = true);
 
   void Record(const rb::y1a::IntegratedRobot::Observation& observation, const rb::y1a::IntegratedRobot::Action& action);
 
@@ -118,6 +118,8 @@ class AppMain {
   std::unique_ptr<rb::EventLoop> publisher_ev_;
   std::unique_ptr<rb::EventLoop> service_ev_;
   std::unique_ptr<rb::EventLoop> record_ev_;
+  int record_data_count_ = 0;
+  std::atomic<bool> recording_ready_{true};
 
   State state_;
 

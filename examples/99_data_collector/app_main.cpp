@@ -93,18 +93,41 @@ AppMain::AppMain(const std::string& config_file) {
 }
 
 AppMain::~AppMain() {
+  robot_.reset();
+
+  StopRecording().get();
+
+  std::cout << "publisher_ev reset ... ";
+  publisher_ev_->Stop();
+  publisher_ev_->PurgeTasks();
   publisher_ev_.reset();
-  record_ev_.reset();
+  std::cout << " - finished" << std::endl;
+
+  std::cout << "service_ev reset ... ";
+  service_ev_->Stop();
+  service_ev_->PurgeTasks();
   service_ev_.reset();
-  state_buf_.reset();
+  std::cout << " - finished" << std::endl;
+
+  std::cout << "record_ev reset ... ";
+  record_ev_.reset();
+  std::cout << " - finished" << std::endl;
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   if (slave_) {
     slave_.reset();
+    std::cout << "slave deleted" << std::endl;
   }
 
   if (master_) {
     master_.reset();
+    std::cout << "master deleted" << std::endl;
   }
+
+  std::cout << "state_buf reset ... ";
+  state_buf_.reset();
+  std::cout << " - finished" << std::endl;
 }
 
 void AppMain::Initialize(const Config& config) {
@@ -122,11 +145,15 @@ void AppMain::Initialize(const Config& config) {
 
   master_ = std::make_unique<y1a::MasterArm>(config_.master_config);
 
+  std::cout << "Master Arm Initialized" << std::endl;
+
   slave_ = std::make_unique<y1a::IntegratedRobot>(config_.slave_config);
-  if (!slave_->WaitUntilReady(10s)) {
+  if (!slave_->WaitUntilReady(15s)) {
     std::cout << "error" << std::endl;
     slave_.reset();
   }
+
+  std::cout << "Integrated Robot Initialized" << std::endl;
 
   InitializeServer();
 }
@@ -158,6 +185,10 @@ void AppMain::InitializeServer() {
 
   robot_->StartStateUpdate(
       [=](const RobotState<y1_model::A>& state, const ControlManagerState& control_state) {
+        if (!state_buf_) {
+          return;
+        }
+
         state_buf_->PushTask([=] {
           state_.power_12v = (state.power_states[power_12v_idx].state == PowerState::State::kPowerOn);
           state_.power_48v = (state.power_states[power_48v_idx].state == PowerState::State::kPowerOn);
@@ -185,6 +216,10 @@ void AppMain::InitializeServer() {
 
   publisher_ev_->PushCyclicTask(
       [=] {
+        if (!state_buf_) {
+          return;
+        }
+
         using namespace nlohmann;
 
         state_buf_->PushTask([=] {
@@ -219,13 +254,28 @@ void AppMain::InitializeServer() {
 
         static auto last_time = std::chrono::steady_clock::now();
         if (std::chrono::steady_clock::now() - last_time > 500ms) {
-          nlohmann::json image_j;
-          for (const auto& [name, image] : state.slave_observation.images) {
-            image_j[name] = MatToJson(image);
+          static std::future<void> image_future;
+          bool done = true;
+          if (image_future.valid()) {
+            if (image_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {
+              done = false;
+            }
           }
-          zmq::send_multipart(pub_sock_,
-                              std::array<zmq::const_buffer, 2>{zmq::str_buffer("image"), zmq::buffer(image_j.dump())});
-          last_time = std::chrono::steady_clock::now();
+          if (done) {
+            image_future = std::async(std::launch::async, [s = state, this] {
+              nlohmann::json image_j;
+              for (const auto& [name, image] : s.slave_observation.images) {
+                cv::Mat resizedImg;
+                cv::resize(image, resizedImg, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+                image_j[name] = MatToJson(resizedImg);
+              }
+              publisher_ev_->PushTask([=] {
+                zmq::send_multipart(
+                    pub_sock_, std::array<zmq::const_buffer, 2>{zmq::str_buffer("image"), zmq::buffer(image_j.dump())});
+              });
+            });
+            last_time = std::chrono::steady_clock::now();
+          }
         }
       },
       100ms);
@@ -236,6 +286,10 @@ void AppMain::InitializeServer() {
 
   service_ev_->PushCyclicTask(
       [=] {
+        if (!state_buf_) {
+          return;
+        }
+
         State state = state_buf_->DoTask([=] { return state_; });
 
         try {
@@ -299,7 +353,7 @@ void AppMain::InitializeServer() {
               name = j["name"];
             }
 
-            if (!teleop_) {
+            if (teleop_) {
               StartRecording(config_.record.path + "/" + name + ".h5");
             }
           } else if (command == kCommandStopRecording) {
@@ -308,9 +362,7 @@ void AppMain::InitializeServer() {
               valid = j["valid"];
             }
 
-            if (teleop_) {
-              StopRecording(valid);
-            }
+            StopRecording(valid);
           }
         } catch (...) {}
       },
@@ -318,7 +370,10 @@ void AppMain::InitializeServer() {
 }
 
 void AppMain::Wait() {
-  service_ev_->WaitForTasks();
+  // TODO .. ?
+  while (true) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
 }
 
 AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
@@ -329,11 +384,14 @@ AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
   auto slave_obs = app_->slave_->GetObservation();
   qpos_ref_ = slave_obs.robot_qpos;
 
-  loop_.PushCyclicTask([=] { loop(); }, std::chrono::nanoseconds((long)(1.e9 / app_->config_.record.fps)));
+  auto rt_thread = std::make_unique<rb::Thread>();
+  rt_thread->SetOSPriority(90, SCHED_RR);
+  loop_ = std::make_unique<rb::EventLoop>(std::move(rt_thread));
+  loop_->PushCyclicTask([=] { loop(); }, std::chrono::nanoseconds((long)(1.e9 / app_->config_.record.fps)));
 }
 
 AppMain::Teleop::~Teleop() {
-  app_->StopRecording();
+  app_->StopRecording().get();
   app_->state_.teleop = false;
 
   std::cout << "Destruct tele-operation" << std::endl;
@@ -383,12 +441,23 @@ void AppMain::Teleop::loop() {
 
   if (app_->state_.recording) {
     app_->Record(slave_obs, action);
+    app_->record_data_count_++;
+    if (app_->record_data_count_ % 100 == 0) {
+      std::cout << app_->state_.recording_count << " / " << app_->record_data_count_ << std::endl;
+    }
   }
 }
 
 void AppMain::StartRecording(const std::string& file_path) {
+  if (!recording_ready_.load()) {
+    return;
+  }
+
+  state_.recording = true;
+  state_.recording_count = 0;
+
   record_ev_->PushTask([=] {
-    if (state_.recording) {
+    if (record_file_) {
       return;
     }
 
@@ -423,14 +492,22 @@ void AppMain::StartRecording(const std::string& file_path) {
     record_ft_dataset_ =
         std::make_unique<HighFive::DataSet>(CreateDataSet<double>(*record_file_, "/observations/ft_sensor", {6 * 2}));
 
-    state_.recording = true;
-    state_.recording_count = 0;
+    record_data_count_ = 0;
+    recording_ready_ = false;
   });
 }
 
-void AppMain::StopRecording(bool valid) {
-  record_ev_->PushTask([=] {
-    if (!state_.recording) {
+std::future<void> AppMain::StopRecording(bool valid) {
+  if (recording_ready_.load()) {
+    std::promise<void> f;
+    f.set_value();
+    return f.get_future();
+  }
+
+  state_.recording = false;
+
+  return record_ev_->Submit([=] {
+    if (!record_file_) {
       return;
     }
 
@@ -447,7 +524,7 @@ void AppMain::StopRecording(bool valid) {
     record_file_.reset();
     record_file_ = nullptr;
 
-    state_.recording = false;
+    recording_ready_ = true;
   });
 }
 

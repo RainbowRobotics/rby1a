@@ -108,8 +108,6 @@ class IntegratedRobot {
   void Initialize_gripper();
   void Initialize_camera();
 
-  rs2::context rs_ctx;
-
   Config config_;
   EventLoop observation_buf_;
   EventLoop gripper_buf_;
@@ -118,7 +116,7 @@ class IntegratedRobot {
   ObservationState obs_state;
 
   std::shared_ptr<Robot<Model>> robot_;
-  std::shared_ptr<rb::DynamixelBus> gripper_;
+  std::unique_ptr<rb::DynamixelBus> gripper_;
 
   std::unique_ptr<RobotCommandStreamHandler<Model>> robot_command_stream_handler_;
 
