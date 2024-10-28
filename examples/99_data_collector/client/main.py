@@ -148,6 +148,8 @@ class DataCollectorGui(QMainWindow, Ui_MainWindow):
         self.PB_StopRecordingInvalid.clicked.connect(self.stop_recording_invalid)
         self.PB_Close.clicked.connect(self.close)
 
+        self.showFullScreen()
+
     def setup_zmq(self):
         self.ctx = zmq.Context.instance()
 
