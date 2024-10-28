@@ -243,10 +243,10 @@ class Ui_MainWindow(object):
 
         self.gridLayout_3.addWidget(self.label_11, 2, 0, 1, 1)
 
-        self.Pb_ResetEpisodeNumber = QPushButton(self.centralwidget)
-        self.Pb_ResetEpisodeNumber.setObjectName(u"Pb_ResetEpisodeNumber")
+        self.PB_ResetEpisodeNumber = QPushButton(self.centralwidget)
+        self.PB_ResetEpisodeNumber.setObjectName(u"PB_ResetEpisodeNumber")
 
-        self.gridLayout_3.addWidget(self.Pb_ResetEpisodeNumber, 2, 2, 1, 1)
+        self.gridLayout_3.addWidget(self.PB_ResetEpisodeNumber, 2, 2, 1, 1)
 
         self.LE_EpisodeName = QLineEdit(self.centralwidget)
         self.LE_EpisodeName.setObjectName(u"LE_EpisodeName")
@@ -298,13 +298,21 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_4.addWidget(self.PB_StartRecording)
 
-        self.PB_StopRecording = QPushButton(self.centralwidget)
-        self.PB_StopRecording.setObjectName(u"PB_StopRecording")
-        sizePolicy.setHeightForWidth(self.PB_StopRecording.sizePolicy().hasHeightForWidth())
-        self.PB_StopRecording.setSizePolicy(sizePolicy)
-        self.PB_StopRecording.setStyleSheet(u"QPushButton {background-color: #f16a6f}")
+        self.PB_StopRecordingValid = QPushButton(self.centralwidget)
+        self.PB_StopRecordingValid.setObjectName(u"PB_StopRecordingValid")
+        sizePolicy.setHeightForWidth(self.PB_StopRecordingValid.sizePolicy().hasHeightForWidth())
+        self.PB_StopRecordingValid.setSizePolicy(sizePolicy)
+        self.PB_StopRecordingValid.setStyleSheet(u"QPushButton {background-color: #55a194}")
 
-        self.horizontalLayout_4.addWidget(self.PB_StopRecording)
+        self.horizontalLayout_4.addWidget(self.PB_StopRecordingValid)
+
+        self.PB_StopRecordingInvalid = QPushButton(self.centralwidget)
+        self.PB_StopRecordingInvalid.setObjectName(u"PB_StopRecordingInvalid")
+        sizePolicy.setHeightForWidth(self.PB_StopRecordingInvalid.sizePolicy().hasHeightForWidth())
+        self.PB_StopRecordingInvalid.setSizePolicy(sizePolicy)
+        self.PB_StopRecordingInvalid.setStyleSheet(u"QPushButton {background-color: #f16a6f}")
+
+        self.horizontalLayout_4.addWidget(self.PB_StopRecordingInvalid)
 
         self.LE_Recording = QLineEdit(self.centralwidget)
         self.LE_Recording.setObjectName(u"LE_Recording")
@@ -337,6 +345,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.setStretch(1, 1)
         self.horizontalLayout_4.setStretch(2, 1)
         self.horizontalLayout_4.setStretch(3, 1)
+        self.horizontalLayout_4.setStretch(4, 1)
 
         self.verticalLayout_2.addLayout(self.horizontalLayout_4)
 
@@ -449,14 +458,18 @@ class Ui_MainWindow(object):
         self.label_8.setText(QCoreApplication.translate("MainWindow", u"Available", None))
         self.label_9.setText(QCoreApplication.translate("MainWindow", u"Capacity", None))
         self.label_11.setText(QCoreApplication.translate("MainWindow", u"#", None))
-        self.Pb_ResetEpisodeNumber.setText(QCoreApplication.translate("MainWindow", u"Reset", None))
+        self.PB_ResetEpisodeNumber.setText(QCoreApplication.translate("MainWindow", u"Reset", None))
         self.label_10.setText(QCoreApplication.translate("MainWindow", u"Name", None))
         self.label_12.setText(QCoreApplication.translate("MainWindow", u"Episode", None))
         self.PB_Close.setText(QCoreApplication.translate("MainWindow", u"Close", None))
         self.PB_StartRecording.setText(QCoreApplication.translate("MainWindow", u"Start\n"
 "Recording", None))
-        self.PB_StopRecording.setText(QCoreApplication.translate("MainWindow", u"Stop\n"
-"Recording", None))
+        self.PB_StopRecordingValid.setText(QCoreApplication.translate("MainWindow", u"Stop\n"
+"Recording\n"
+"(VALID)", None))
+        self.PB_StopRecordingInvalid.setText(QCoreApplication.translate("MainWindow", u"Stop\n"
+"Recording\n"
+"(INVALID)", None))
         self.L_RecordingCount.setText(QCoreApplication.translate("MainWindow", u"0", None))
         self.L_Cam0Depth.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))
         self.L_Cam1RGB.setText(QCoreApplication.translate("MainWindow", u"Image Placeholder", None))

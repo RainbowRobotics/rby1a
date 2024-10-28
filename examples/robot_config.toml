@@ -20,7 +20,7 @@ dev_name = "/dev/rby1-gripper"
 height = 240
 width = 424
 fps = 60
-sensors = [
+sensors = [# Camera needs to support both RGB and Depth
     { name = "cam0", serial = "233522071632" },
     { name = "cam1", serial = "218622270382" },
     { name = "cam2", serial = "128422271273" }

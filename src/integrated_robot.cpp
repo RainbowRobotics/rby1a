@@ -439,10 +439,8 @@ void IntegratedRobot::Initialize_camera() {
             auto depth = frame.as<rs2::depth_frame>();
             auto depth_image = cv::Mat(cv::Size(config_.camera.width, config_.camera.height), CV_16UC1,
                                        (void*)depth.get_data(), cv::Mat::AUTO_STEP);
-            cv::Mat scaled_depth_image;
-            depth_image.convertTo(scaled_depth_image, CV_32FC1);
-            scaled_depth_image *= scale;
-            observation_buf_.PushTask([name, depth_image = scaled_depth_image.clone(), current_time, this] {
+            depth_image *= (scale * 1000);  // meter to milli-meter
+            observation_buf_.PushTask([name, depth_image = depth_image.clone(), current_time, this] {
               obs_state.camera_updated_time = current_time;
               obs.images[name + "_depth"] = depth_image;
             });

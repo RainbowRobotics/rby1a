@@ -23,6 +23,8 @@ class AppMain {
   const std::string kCommandReadyPose = "ready_pose";
   const std::string kCommandStartTeleop = "start_teleop";
   const std::string kCommandStopTeleop = "stop_teleop";
+  const std::string kCommandStartRecording = "start_recording";
+  const std::string kCommandStopRecording = "stop_recording";
 
   struct ConfigRecord {
     double fps{30};
@@ -36,8 +38,8 @@ class AppMain {
   };
 
   struct Config {
-    std::string master_config;  // master arm
-    std::string slave_config;   // robot
+    rb::y1a::MasterArm::Config master_config;       // master arm
+    rb::y1a::IntegratedRobot::Config slave_config;  // robot
 
     ConfigRecord record;
     ConfigServer server;
@@ -85,19 +87,11 @@ class AppMain {
 
   void Wait();
 
-  void StartTeleoperation();
+  void StartRecording(const std::string& file_path);
 
-  void StopTeleoperation();
+  void StopRecording(bool valid = true);
 
-  void Zero();
-
-  void Ready();
-
-  void StartRecord(const std::string& file);
-
-  void StopRecord();
-
-  void Record(rb::y1a::IntegratedRobot::Observation observation, rb::y1a::IntegratedRobot::Action action);
+  void Record(const rb::y1a::IntegratedRobot::Observation& observation, const rb::y1a::IntegratedRobot::Action& action);
 
  private:
   void Initialize(const Config& config);
@@ -120,16 +114,16 @@ class AppMain {
   zmq::socket_t srv_sock_;
   zmq::socket_t pub_sock_;
 
-  rb::EventLoop state_buf_;
-  rb::EventLoop publisher_ev_;
-  rb::EventLoop service_ev_;
-  rb::EventLoop record_ev_;
+  std::unique_ptr<rb::EventLoop> state_buf_;
+  std::unique_ptr<rb::EventLoop> publisher_ev_;
+  std::unique_ptr<rb::EventLoop> service_ev_;
+  std::unique_ptr<rb::EventLoop> record_ev_;
 
   State state_;
 
   std::unique_ptr<HighFive::File> record_file_{nullptr};
-  std::vector<std::unique_ptr<HighFive::DataSet>> record_depth_datasets_;
-  std::vector<std::unique_ptr<HighFive::DataSet>> record_rgb_datasets_;
+  std::unordered_map<std::string, std::unique_ptr<HighFive::DataSet>> record_depth_datasets_;
+  std::unordered_map<std::string, std::unique_ptr<HighFive::DataSet>> record_rgb_datasets_;
   std::unique_ptr<HighFive::DataSet> record_action_dataset_;
   std::unique_ptr<HighFive::DataSet> record_qpos_dataset_;
   std::unique_ptr<HighFive::DataSet> record_qvel_dataset_;

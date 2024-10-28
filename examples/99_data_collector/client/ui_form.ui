@@ -349,7 +349,7 @@
              </widget>
             </item>
             <item row="2" column="2">
-             <widget class="QPushButton" name="Pb_ResetEpisodeNumber">
+             <widget class="QPushButton" name="PB_ResetEpisodeNumber">
               <property name="text">
                <string>Reset</string>
               </property>
@@ -400,7 +400,7 @@
        </layout>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1,1,1">
+       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1,1,1,1">
         <item>
          <widget class="QPushButton" name="PB_StartRecording">
           <property name="sizePolicy">
@@ -416,7 +416,25 @@ Recording</string>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="PB_StopRecording">
+         <widget class="QPushButton" name="PB_StopRecordingValid">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {background-color: #55a194}</string>
+          </property>
+          <property name="text">
+           <string>Stop
+Recording
+(VALID)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="PB_StopRecordingInvalid">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
             <horstretch>0</horstretch>
@@ -428,7 +446,8 @@ Recording</string>
           </property>
           <property name="text">
            <string>Stop
-Recording</string>
+Recording
+(INVALID)</string>
           </property>
          </widget>
         </item>

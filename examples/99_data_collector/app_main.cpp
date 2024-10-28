@@ -46,7 +46,7 @@ void AddDataIntoDataSet(std::unique_ptr<HighFive::DataSet>& dataset, const std::
 
 template <typename T>
 HighFive::DataSet CreateDataSet(HighFive::File& file, const std::string& name, const std::vector<std::size_t>& shape,
-                                int compression_level) {
+                                int compression_level = 0) {
   std::vector<size_t> dims = {0};
   std::vector<size_t> max_dims = {HighFive::DataSpace::UNLIMITED};
   std::vector<hsize_t> chunk_size = {1};
@@ -72,11 +72,11 @@ AppMain::AppMain(const std::string& config_file) {
 
   std::stringstream master_ss;
   master_ss << tbl["master"];
-  config.master_config = master_ss.str();
+  config.master_config = rb::y1a::MasterArm::ParseConfig(master_ss.str());
 
   std::stringstream slave_ss;
   slave_ss << tbl["slave"];
-  config.slave_config = slave_ss.str();
+  config.slave_config = rb::y1a::IntegratedRobot::ParseConfig(slave_ss.str());
 
   ConfigRecord& config_record = config.record;
   auto record = tbl["record"];
@@ -93,11 +93,10 @@ AppMain::AppMain(const std::string& config_file) {
 }
 
 AppMain::~AppMain() {
-  // TODO Close
-  // state_buf_;
-  // publisher_ev_;
-  // service_ev_;
-  // record_ev_;
+  publisher_ev_.reset();
+  record_ev_.reset();
+  service_ev_.reset();
+  state_buf_.reset();
 
   if (slave_) {
     slave_.reset();
@@ -114,11 +113,16 @@ void AppMain::Initialize(const Config& config) {
 
   config_ = config;
 
+  publisher_ev_ = std::make_unique<rb::EventLoop>();
+  state_buf_ = std::make_unique<rb::EventLoop>();
+  service_ev_ = std::make_unique<rb::EventLoop>();
+  record_ev_ = std::make_unique<rb::EventLoop>();
+
   //
 
-  master_ = std::make_unique<y1a::MasterArm>(y1a::MasterArm::ParseConfig(config_.master_config));
+  master_ = std::make_unique<y1a::MasterArm>(config_.master_config);
 
-  slave_ = std::make_unique<y1a::IntegratedRobot>(y1a::IntegratedRobot::ParseConfig(config_.slave_config));
+  slave_ = std::make_unique<y1a::IntegratedRobot>(config_.slave_config);
   if (!slave_->WaitUntilReady(10s)) {
     std::cout << "error" << std::endl;
     slave_.reset();
@@ -154,7 +158,7 @@ void AppMain::InitializeServer() {
 
   robot_->StartStateUpdate(
       [=](const RobotState<y1_model::A>& state, const ControlManagerState& control_state) {
-        state_buf_.PushTask([=] {
+        state_buf_->PushTask([=] {
           state_.power_12v = (state.power_states[power_12v_idx].state == PowerState::State::kPowerOn);
           state_.power_48v = (state.power_states[power_48v_idx].state == PowerState::State::kPowerOn);
           state_.servo_on = state.is_ready.all();
@@ -179,21 +183,25 @@ void AppMain::InitializeServer() {
   srv_sock_ = zmq::socket_t(zmq_ctx_, zmq::socket_type::router);
   srv_sock_.bind("tcp://*:" + std::to_string(config_.server.request_server_port));
 
-  publisher_ev_.PushCyclicTask(
+  publisher_ev_->PushCyclicTask(
       [=] {
         using namespace nlohmann;
 
-        state_buf_.PushTask([=] {
+        state_buf_->PushTask([=] {
           std::filesystem::space_info si = std::filesystem::space(config_.record.path);
           state_.upc_storage_free = (double)si.free / (1 << 20);  // MB 단위로 변환
           state_.upc_storage_available = (double)si.available / (1 << 20);
           state_.upc_storage_capacity = (double)si.capacity / (1 << 20);
 
-          state_.master_state = master_->GetState();
-          state_.slave_observation = slave_->GetObservation();
+          if (master_) {
+            state_.master_state = master_->GetState();
+          }
+          if (slave_) {
+            state_.slave_observation = slave_->GetObservation();
+          }
         });
 
-        auto state = state_buf_.DoTask([=] { return state_; });
+        auto state = state_buf_->DoTask([=] { return state_; });
 
         json j;
         j["power_12v"] = state.power_12v;
@@ -226,9 +234,9 @@ void AppMain::InitializeServer() {
    * SERVICE
    ************************/
 
-  service_ev_.PushCyclicTask(
+  service_ev_->PushCyclicTask(
       [=] {
-        State state = state_buf_.DoTask([=] { return state_; });
+        State state = state_buf_->DoTask([=] { return state_; });
 
         try {
           std::vector<zmq::message_t> recv_msgs;
@@ -248,11 +256,21 @@ void AppMain::InitializeServer() {
 
           if (command == kCommandResetMaster) {
             if (!state.teleop) {
-              master_ = std::make_unique<y1a::MasterArm>(y1a::MasterArm::ParseConfig(config_.master_config));
+              state_buf_->Pause();
+              state_buf_->WaitForTasks();
+              master_ = std::make_unique<y1a::MasterArm>(config_.master_config);
+              state_buf_->Unpause();
             }
           } else if (command == kCommandResetSlave) {
             if (!state.teleop) {
-              slave_ = std::make_unique<y1a::IntegratedRobot>(y1a::IntegratedRobot::ParseConfig(config_.slave_config));
+              state_buf_->Pause();
+              state_buf_->WaitForTasks();
+              slave_ = std::make_unique<y1a::IntegratedRobot>(config_.slave_config);
+              if (!slave_->WaitUntilReady(10s)) {
+                std::cout << "error" << std::endl;
+                slave_.reset();
+              }
+              state_buf_->Unpause();
             }
           } else if (command == kCommandZeroPose) {
             if (slave_ && !state.teleop) {
@@ -275,6 +293,24 @@ void AppMain::InitializeServer() {
             teleop_ = std::make_unique<Teleop>(this);
           } else if (command == kCommandStopTeleop) {
             teleop_.reset();
+          } else if (command == kCommandStartRecording) {
+            std::string name{"example"};
+            if (j.contains("name")) {
+              name = j["name"];
+            }
+
+            if (!teleop_) {
+              StartRecording(config_.record.path + "/" + name + ".h5");
+            }
+          } else if (command == kCommandStopRecording) {
+            bool valid = true;
+            if (j.contains("valid")) {
+              valid = j["valid"];
+            }
+
+            if (teleop_) {
+              StopRecording(valid);
+            }
           }
         } catch (...) {}
       },
@@ -282,7 +318,7 @@ void AppMain::InitializeServer() {
 }
 
 void AppMain::Wait() {
-  service_ev_.WaitForTasks();
+  service_ev_->WaitForTasks();
 }
 
 AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
@@ -297,7 +333,7 @@ AppMain::Teleop::Teleop(AppMain* app) : app_(app) {
 }
 
 AppMain::Teleop::~Teleop() {
-  // app_->StopRecording();
+  app_->StopRecording();
   app_->state_.teleop = false;
 
   std::cout << "Destruct tele-operation" << std::endl;
@@ -331,12 +367,11 @@ void AppMain::Teleop::loop() {
   Eigen::Vector3d center = (rb::math::SE3::GetPosition(T_12) + rb::math::SE3::GetPosition(T_13)) / 2.;
   double yaw = atan2(center(1), center(0));
   double pitch = atan2(-center(2), center(0)) + 15 * M_PI / 180.;
-  yaw = std::clamp(yaw, -0.523, 0.523);  // TODO
+  yaw = std::clamp(yaw, -0.523, 0.523);
   pitch = std::clamp(pitch, -0.35, 1.57);
   qpos_ref_.block<2, 1>(2 + 6 + 7 + 7, 0) = Eigen::Vector<double, 2>{yaw, pitch};
-  for (int i = 0; i < 14 + 2; i++) {
-    qpos_ref_(2 + 6 + i) =
-        std::clamp(qpos_ref_(2 + 6 + i), app_->q_lower_limit_(2 + 6 + i), app_->q_upper_limit_(2 + 6 + i));
+  for (int i = 0; i < 6 + 14 + 2; i++) {
+    qpos_ref_(2 + i) = std::clamp(qpos_ref_(2 + i), app_->q_lower_limit_(2 + i), app_->q_upper_limit_(2 + i));
   }
 
   rb::y1a::IntegratedRobot::Action action;
@@ -346,42 +381,131 @@ void AppMain::Teleop::loop() {
       Eigen::Vector2d{master_state.button_right.trigger, master_state.button_left.trigger} / 1000.;
   app_->slave_->Step(action, 1 / app_->config_.record.fps * 1.05);
 
-  // app_->Record(slave_obs, action);
+  if (app_->state_.recording) {
+    app_->Record(slave_obs, action);
+  }
 }
 
-void AppMain::StartRecord(const std::string& file) {
-  record_ev_.PushTask([=] {
+void AppMain::StartRecording(const std::string& file_path) {
+  record_ev_->PushTask([=] {
     if (state_.recording) {
       return;
     }
 
-    // TODO: make record file
+    const int kCompressionLevel = 0;
+
+    record_file_ = std::make_unique<HighFive::File>(file_path, HighFive::File::Overwrite);
+    record_file_->createAttribute("frequency", config_.record.fps);
+
+    // Create Dataset
+    std::size_t height = config_.slave_config.camera.height;
+    std::size_t width = config_.slave_config.camera.width;
+    for (const auto& [name, _] : config_.slave_config.camera.sensors) {
+      auto depth = std::make_unique<HighFive::DataSet>(CreateDataSet<uint16_t>(
+          *record_file_, "/observations/images/" + name + "_depth", {height, width}, kCompressionLevel));
+      depth->createAttribute("scale", 1000);
+      record_depth_datasets_[name + "_depth"] = std::move(depth);
+
+      record_rgb_datasets_[name + "_rgb"] = std::make_unique<HighFive::DataSet>(CreateDataSet<std::uint8_t>(
+          *record_file_, "/observations/images/" + name + "_rgb", {height, width, 3}, kCompressionLevel));
+    }
+    record_action_dataset_ = std::make_unique<HighFive::DataSet>(CreateDataSet<double>(
+        *record_file_, "/action", {rb::y1a::IntegratedRobot::kRobotDOF + rb::y1a::IntegratedRobot::kGripperDOF}));
+    record_qpos_dataset_ = std::make_unique<HighFive::DataSet>(
+        CreateDataSet<double>(*record_file_, "/observations/qpos",
+                              {rb::y1a::IntegratedRobot::kRobotDOF + rb::y1a::IntegratedRobot::kGripperDOF}));
+    record_qvel_dataset_ = std::make_unique<HighFive::DataSet>(
+        CreateDataSet<double>(*record_file_, "/observations/qvel",
+                              {rb::y1a::IntegratedRobot::kRobotDOF + rb::y1a::IntegratedRobot::kGripperDOF}));
+    record_torque_dataset_ = std::make_unique<HighFive::DataSet>(
+        CreateDataSet<double>(*record_file_, "/observations/torque",
+                              {rb::y1a::IntegratedRobot::kRobotDOF + rb::y1a::IntegratedRobot::kGripperDOF}));
+    record_ft_dataset_ =
+        std::make_unique<HighFive::DataSet>(CreateDataSet<double>(*record_file_, "/observations/ft_sensor", {6 * 2}));
 
     state_.recording = true;
     state_.recording_count = 0;
   });
 }
 
-void AppMain::StopRecord() {
-  record_ev_.PushTask([=] {
+void AppMain::StopRecording(bool valid) {
+  record_ev_->PushTask([=] {
     if (!state_.recording) {
       return;
     }
+
+    record_file_->createAttribute("valid", valid);
+
+    record_depth_datasets_.clear();
+    record_rgb_datasets_.clear();
+    record_action_dataset_.reset();
+    record_qpos_dataset_.reset();
+    record_qvel_dataset_.reset();
+    record_torque_dataset_.reset();
+    record_ft_dataset_.reset();
+    record_file_->flush();
+    record_file_.reset();
+    record_file_ = nullptr;
+
     state_.recording = false;
   });
 }
 
-void AppMain::Record(rb::y1a::IntegratedRobot::Observation observation, rb::y1a::IntegratedRobot::Action action) {
+void AppMain::Record(const rb::y1a::IntegratedRobot::Observation& observation,
+                     const rb::y1a::IntegratedRobot::Action& action) {
+  using namespace rb::y1a;
 
-  record_ev_.PushTask([=] {
+  record_ev_->PushTask([obs = observation, act = action, this] {
     if (!state_.recording) {
       return;
     }
 
-    // TODO: Add data
-
     if (!record_file_) {
       return;
     }
+
+    std::size_t height = config_.slave_config.camera.height;
+    std::size_t width = config_.slave_config.camera.width;
+    Eigen::Vector<double, IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF> record_action;
+    Eigen::Vector<double, IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF> record_qpos;
+    Eigen::Vector<double, IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF> record_qvel;
+    Eigen::Vector<double, IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF> record_torque;
+    Eigen::Vector<double, 6 * 2> record_ft;
+    record_action = act.actions;
+    record_qpos.head<IntegratedRobot::kRobotDOF>() = obs.robot_qpos;
+    record_qpos.tail<IntegratedRobot::kGripperDOF>() = obs.gripper_qpos;
+    record_qvel.head<IntegratedRobot::kRobotDOF>() = obs.robot_qvel;
+    record_qvel.tail<IntegratedRobot::kGripperDOF>() = obs.gripper_qvel;
+    record_torque.head<IntegratedRobot::kRobotDOF>() = obs.robot_torque;
+    record_torque.tail<IntegratedRobot::kGripperDOF>() = obs.gripper_torque;
+    record_ft.head<6>() = obs.right_ft;
+    record_ft.tail<6>() = obs.left_ft;
+
+    for (const auto& [name, image] : obs.images) {
+      if (image.type() == CV_16UC1) {
+        if (record_depth_datasets_.find(name) == record_depth_datasets_.end()) {
+          std::cerr << "Depth dataset (" << name << ") is not initialized" << std::endl;
+          continue;
+        }
+        AddDataIntoDataSet(record_depth_datasets_[name], {height, width}, (uint16_t*)image.data);
+      } else if (image.type() == CV_8UC3) {
+        if (record_rgb_datasets_.find(name) == record_rgb_datasets_.end()) {
+          std::cerr << "RGB dataset (" << name << ") is not initialized" << std::endl;
+          continue;
+        }
+        AddDataIntoDataSet(record_rgb_datasets_[name], {height, width, 3}, image.data);
+      }
+    }
+    AddDataIntoDataSet(record_action_dataset_, {IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF},
+                       record_action.data());
+    AddDataIntoDataSet(record_qpos_dataset_, {IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF},
+                       record_qpos.data());
+    AddDataIntoDataSet(record_qvel_dataset_, {IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF},
+                       record_qvel.data());
+    AddDataIntoDataSet(record_torque_dataset_, {IntegratedRobot::kRobotDOF + IntegratedRobot::kGripperDOF},
+                       record_torque.data());
+    AddDataIntoDataSet(record_ft_dataset_, {6 * 2}, record_ft.data());
+
+    state_.recording_count++;
   });
 }
