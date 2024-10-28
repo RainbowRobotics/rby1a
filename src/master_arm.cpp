@@ -107,8 +107,6 @@ void MasterArm::Initialize(const MasterArm::Config& config) {
     throw std::runtime_error("failed to active master arm motors");
   }
 
-  static bool ma_init = false;
-  static Eigen::Vector<double, upc::MasterArm::kDOF / 2> ma_q_right, ma_q_left;
   ma_init = false;
   ma_q_right.setZero();
   ma_q_left.setZero();

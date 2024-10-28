@@ -51,6 +51,9 @@ class MasterArm {
 
   std::shared_ptr<Robot<Model>> robot_{nullptr};
   std::shared_ptr<rb::upc::MasterArm> master_arm_{nullptr};
+
+  bool ma_init;
+  Eigen::Vector<double, upc::MasterArm::kDOF / 2> ma_q_right, ma_q_left;
 };
 
 }  // namespace rb::y1a
