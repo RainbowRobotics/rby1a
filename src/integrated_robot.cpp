@@ -166,7 +166,7 @@ void IntegratedRobot::Initialize_robot() {
         auto current_time = std::chrono::steady_clock::now();
         observation_buf_.PushTask([=] {
           obs_state.robot_updated_time = current_time;
-          obs.robot_qpos = rs.position;
+          obs.robot_qpos = rs.target_position;
           obs.robot_qvel = rs.velocity;
           if (config_.robot.obs_torque) {
             obs.robot_torque = rs.torque;

@@ -86,9 +86,10 @@ int main(int argc, char** argv) {
   std::future<std::pair<long, std::vector<rb::y1a::IntegratedRobot::Action>>> inference_future;
   std::vector<std::pair<long, rb::y1a::IntegratedRobot::Action>> inference_result;
 
-  std::priority_queue<TimedAction, std::vector<TimedAction>, comp> que;
+  std::queue<TimedAction> que;
 
   rb::y1a::IntegratedRobot::Action action;
+  rb::y1a::IntegratedRobot::Action target;
   action.actions.setZero();
   {
     auto obs = robot.GetObservation();
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
     action.actions.head<rb::y1a::IntegratedRobot::kRobotDOF>() = obs.robot_qpos;
     action.actions.tail<rb::y1a::IntegratedRobot::kGripperDOF>() = obs.gripper_qpos;
   }
+  target = action;
 
   auto fps = 50.;
   auto dt = 1. / fps;
@@ -120,23 +122,26 @@ int main(int argc, char** argv) {
               ta.timestamp = start + dt_micro * (i + 1);
               ta.weight = (double)(inference_result.second.size() - i) / (double)inference_result.second.size();
               ta.action = inference_result.second[i];
-              if (ta.timestamp >= current_time) {
-                que.push(ta);
-              }
+              // if (ta.timestamp >= current_time) {
+              que.push(ta);
+              // }
             }
           }
         }
-        if (done) {
+        if (done && que.empty()) {
           inference_future = std::async(std::launch::async, [=] {
+            auto gripper = obs.gripper_qpos;
+
+            gripper(0) = gripper(0) * (13.522 - 3.98988) + 3.98988;
+            gripper(1) = gripper(1) * (15.1726 - 5.59596) + 5.59596;
+
             {
               json j;
               j["timestamp"] = current_time;
               j["robot_qpos"] = obs.robot_qpos;
-              j["gripper_qpos"] = obs.gripper_qpos;
+              j["gripper_qpos"] = gripper;
               for (const auto& [name, image] : obs.images) {
-                cv::Mat resizedImg;
-                cv::resize(image, resizedImg, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
-                j[name] = MatToJson(resizedImg);
+                j[name] = MatToJson(image);
               }
               sock_.send(zmq::buffer(json::to_msgpack(j)));
             }
@@ -160,6 +165,7 @@ int main(int argc, char** argv) {
                 }
                 actions.push_back(act);
               }
+
               return std::make_pair(timestamp, actions);
             }
           });
@@ -168,15 +174,29 @@ int main(int argc, char** argv) {
         double weight_sum{0};
         rb::y1a::IntegratedRobot::Action ref;
         ref.actions.setZero();
-        while (!que.empty()) {
-          auto item = que.top();
-          if (item.timestamp <= current_time) {
+        if (false) {
+          while (!que.empty()) {
+            auto item = que.front();
+            if (item.timestamp <= current_time) {
+              ref.actions += item.weight * item.action.actions;
+              weight_sum += item.weight;
+            } else {
+              break;
+            }
+            que.pop();
+          }
+        }
+
+        if (true) {
+          while (!que.empty()) {
+            auto item = que.front();
+
             ref.actions += item.weight * item.action.actions;
             weight_sum += item.weight;
-          } else {
+
+            que.pop();
             break;
           }
-          que.pop();
         }
 
         if (weight_sum > 0) {
@@ -185,13 +205,15 @@ int main(int argc, char** argv) {
           ref.actions(2 + 6 + 7 + 7 + 2 + 0) = (ref.actions(2 + 6 + 7 + 7 + 2 + 0) - 3.98988) / (13.522 - 3.98988);
           ref.actions(2 + 6 + 7 + 7 + 2 + 1) = (ref.actions(2 + 6 + 7 + 7 + 2 + 1) - 5.59596) / (15.1726 - 5.59596);
 
-          Eigen::Vector<double, 2 + 6> tmp = action.actions.block<2 + 6, 1>(0, 0);
-          action.actions = lpf_gain * ref.actions + (1 - lpf_gain) * action.actions;
-          action.actions.tail<2>() = ref.actions.tail<2>();
-          action.actions.block<2 + 6, 1>(0, 0) = tmp;
+          target = ref;
         }
 
-        // robot.Step(action, 1. / fps * 1.01);
+        Eigen::Vector<double, 2 + 6> tmp = action.actions.block<2 + 6, 1>(0, 0);
+        action.actions = lpf_gain * target.actions + (1 - lpf_gain) * action.actions;
+        action.actions.tail<2>() = target.actions.tail<2>();
+        action.actions.block<2 + 6, 1>(0, 0) = tmp;
+
+        robot.Step(action, 1. / fps * 1.01);
       },
       std::chrono::nanoseconds((long)(1.e9 / fps)));
 
