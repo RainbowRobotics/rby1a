@@ -79,6 +79,10 @@ void MasterArm::Initialize(const MasterArm::Config& config) {
   if (!robot_->Connect(1 /* iteration */, 1000 /* (ms) */)) {
     throw std::runtime_error("failed to connect robot");
   }
+  robot_->DisableControlManager();
+  using namespace std::chrono_literals;
+  std::this_thread::sleep_for(500ms);
+  
   // power on
   if (!robot_->IsPowerOn("12v")) {
     if (!robot_->PowerOn("12v")) {

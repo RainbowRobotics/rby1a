@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
           action.actions.block<2 + 6, 1>(0, 0) = tmp;
         }
 
-        robot.Step(action, 1. / fps * 1.01);
+        // robot.Step(action, 1. / fps * 1.01);
       },
       std::chrono::nanoseconds((long)(1.e9 / fps)));
 

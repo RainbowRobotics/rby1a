@@ -105,6 +105,8 @@ IntegratedRobot::~IntegratedRobot() {
 }
 
 void IntegratedRobot::Initialize(const Config& config) {
+  std::cout << "Start to initialize intergrated robot" << std::endl;
+
   config_ = config;
 
   /********************************
@@ -124,8 +126,13 @@ void IntegratedRobot::Initialize(const Config& config) {
 }
 
 void IntegratedRobot::Initialize_robot() {
+  std::cout << "What happened to robot create" << std::endl;
   robot_ = Robot<Model>::Create(config_.robot.address);
-  if (!robot_->Connect(1 /* iteration */, 1000 /* (ms) */)) {
+  std::cout << "robot ptr created" << std::endl;
+  std::this_thread::sleep_for(1s);
+
+  std::cout << "Try to connect robot (" << config_.robot.address << ")" << std::endl;
+  if (!robot_->Connect(5 /* iteration */, 1000 /* (ms) */)) {
     throw std::runtime_error("failed to connect robot");
   }
   std::cout << "robot connected ..." << std::endl;

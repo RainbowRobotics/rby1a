@@ -88,6 +88,7 @@ void AppMain::Initialize(const Config& config) {
 
   std::cout << "Master Arm Initialized" << std::endl;
 
+  std::cout << "Try to create integrated robot ..." << std::endl;
   slave_ = std::make_shared<y1a::IntegratedRobot>(config_.slave_config);
   if (!slave_->WaitUntilReady(15s)) {
     std::cout << "error" << std::endl;
