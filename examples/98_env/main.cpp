@@ -4,12 +4,15 @@
 
 #include <iostream>
 #include <queue>
+#include <csignal>
 
+#include "highfive/H5Easy.hpp"
 #include "nlohmann/json.hpp"
 #include "rby1a/integrated_robot.h"
 #include "utils.h"
 #include "zmq.hpp"
 
+using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace rb::y1a;
 using namespace nlohmann;
@@ -17,26 +20,82 @@ using namespace nlohmann;
 zmq::context_t zmq_ctx;
 zmq::socket_t sock_;
 
-struct TimedAction {
-  long timestamp{0};
-  double weight;
-  IntegratedRobot::Action action;
-};
+std::unique_ptr<rb::EventLoop> loop;
+std::unique_ptr<HighFive::File> logger;
 
-struct comp {
-  bool operator()(const TimedAction& l, const TimedAction& r) { return l.timestamp > r.timestamp; }
-};
+template <typename T>
+static void AddDataIntoDataSet(HighFive::DataSet& dataset, const std::vector<std::size_t>& shape, T* data) {
+  auto current_dims = dataset.getSpace().getDimensions();
+  size_t current_rows = current_dims[0];
+  size_t new_rows = current_rows + 1;
+  std::vector<std::size_t> resize = {new_rows}, offset = {current_rows}, count = {1};
+  for (const auto& l : shape) {
+    resize.push_back(l);
+    offset.push_back(0);
+    count.push_back(l);
+  }
+  dataset.resize(resize);
+  dataset.select(offset, count).write_raw(data);
+}
+
+template <typename T>
+static HighFive::DataSet CreateDataSet(HighFive::File& file, const std::string& name,
+                                       const std::vector<std::size_t>& shape, int compression_level = 0) {
+  std::vector<size_t> dims = {0};
+  std::vector<size_t> max_dims = {HighFive::DataSpace::UNLIMITED};
+  std::vector<hsize_t> chunk_size = {1};
+  for (const auto& l : shape) {
+    dims.push_back(l);
+    max_dims.push_back(l);
+    chunk_size.push_back(l);
+  }
+  HighFive::DataSetCreateProps props;
+  props.add(HighFive::Chunking(chunk_size));
+  if (compression_level != 0) {
+    props.add(HighFive::Deflate(compression_level));
+  }
+  return file.createDataSet<T>(name, HighFive::DataSpace(dims, max_dims), props);
+}
+
+void signal_handler(int signum) {
+  std::cout << "signal handler" << std::endl;
+
+  if (loop) {
+    loop.reset();
+  }
+
+  if(logger) {
+    logger->flush();
+    logger.reset();
+  }
+
+  _exit(EXIT_FAILURE);
+  signal(SIGTERM, SIG_DFL);
+  raise(SIGTERM);
+}
 
 int main(int argc, char** argv) {
+  std::signal(SIGINT, signal_handler);
+
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <config file> <inference address>" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <config file> <inference address> <log file (default: log.h5)>" << std::endl;
     return 1;
   }
   std::string config_file{argv[1]};
   std::string inference_address{argv[2]};
+  std::string log_file{"log.h5"};
+  if (argc >= 4) {
+    log_file = std::string{argv[3]};
+  }
 
   sock_ = zmq::socket_t(zmq_ctx, zmq::socket_type::req);
   sock_.connect(inference_address);
+
+  logger = std::make_unique<HighFive::File>(log_file, HighFive::File::Overwrite);
+  HighFive::DataSet log_action = CreateDataSet<double>(*logger, "/action", {26});
+  HighFive::DataSet log_last_obs = CreateDataSet<double>(*logger, "/obs_qpos", {26});
+  HighFive::DataSet log_qpos_ref = CreateDataSet<double>(*logger, "/qpos_ref", {26});
+  HighFive::DataSet log_qpos = CreateDataSet<double>(*logger, "/qpos", {26});
 
   IntegratedRobot robot(config_file);
   if (!robot.WaitUntilReady(10s)) {
@@ -62,7 +121,7 @@ int main(int argc, char** argv) {
       action.actions.block<20, 1>(2, 0) << 0, 40, -70, 30, 0, 0,   // Torso
           -30, -10, 0, -100, 0, 40, 0,                             // Right
           -30, 10, 0, -100, 0, 40, 0;                              // Left
-      action.actions.block<2, 1>(2 + 20, 0) << 0, 0.8;             // Head
+      action.actions.block<2, 1>(2 + 20, 0) << 0, 45;             // Head
       action.actions.block<2, 1>(2 + 6 + 7 + 7 + 2, 0).setZero();  // Gripper
       action.actions *= M_PI / 180.;
       robot.Step(action, 5);
@@ -81,34 +140,36 @@ int main(int argc, char** argv) {
 
   auto rt_thread = std::make_unique<rb::Thread>();
   rt_thread->SetOSPriority(90, SCHED_RR);
-  rb::EventLoop loop(std::move(rt_thread));
+  loop = std::make_unique<rb::EventLoop>(std::move(rt_thread));
 
-  std::future<std::pair<long, std::vector<rb::y1a::IntegratedRobot::Action>>> inference_future;
-  std::vector<std::pair<long, rb::y1a::IntegratedRobot::Action>> inference_result;
+  std::future<std::pair<long, std::vector<IntegratedRobot::Action>>> inference_future;
+  std::vector<std::pair<long, IntegratedRobot::Action>> inference_result;
 
-  std::queue<TimedAction> que;
+  std::queue<IntegratedRobot::Action> que;
 
-  rb::y1a::IntegratedRobot::Action action;
-  rb::y1a::IntegratedRobot::Action target;
+  IntegratedRobot::Action action;
+  IntegratedRobot::Action last_inference_action;
+  IntegratedRobot::Observation last_obs;
   action.actions.setZero();
   {
     auto obs = robot.GetObservation();
+    last_obs = obs;
     action.actions.setZero();
-    action.actions.head<rb::y1a::IntegratedRobot::kRobotDOF>() = obs.robot_qpos;
-    action.actions.tail<rb::y1a::IntegratedRobot::kGripperDOF>() = obs.gripper_qpos;
+    action.actions.head<IntegratedRobot::kRobotDOF>() = obs.robot_qpos;
+    action.actions.tail<IntegratedRobot::kGripperDOF>() = obs.gripper_qpos;
   }
-  target = action;
+  last_inference_action = action;
 
   auto fps = 50.;
   auto dt = 1. / fps;
-  auto dt_micro = (long)(dt * 1e6);
   auto lpf_gain = 0.1;
-  loop.PushCyclicTask(
+  loop->PushCyclicTask(
       [&] {
         auto obs = robot.GetObservation();
-        auto current_time =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                .count();
+        obs.gripper_qpos(0) = obs.gripper_qpos(0) * (13.522 - 3.98988) + 3.98988;
+        obs.gripper_qpos(1) = obs.gripper_qpos(1) * (15.1726 - 5.59596) + 5.59596;
+
+        auto current_time = duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
 
         bool done = true;
         if (inference_future.valid()) {
@@ -117,23 +178,18 @@ int main(int argc, char** argv) {
           } else if (inference_future.wait_for(0s) == std::future_status::ready) {
             auto inference_result = inference_future.get();
             long start = inference_result.first;
+            // for (const auto& item : inference_result.second) {
+            //   que.push(item);
+            // }
             for (int i = 0; i < inference_result.second.size(); i++) {
-              TimedAction ta;
-              ta.timestamp = start + dt_micro * (i + 1);
-              ta.weight = (double)(inference_result.second.size() - i) / (double)inference_result.second.size();
-              ta.action = inference_result.second[i];
-              // if (ta.timestamp >= current_time) {
-              que.push(ta);
-              // }
+              que.push(inference_result.second[i]);
             }
           }
         }
         if (done && que.empty()) {
-          inference_future = std::async(std::launch::async, [=] {
+          inference_future = std::async(std::launch::async, [=, &last_obs] {
+            last_obs = obs;
             auto gripper = obs.gripper_qpos;
-
-            gripper(0) = gripper(0) * (13.522 - 3.98988) + 3.98988;
-            gripper(1) = gripper(1) * (15.1726 - 5.59596) + 5.59596;
 
             {
               json j;
@@ -152,7 +208,8 @@ int main(int argc, char** argv) {
               std::vector<uint8_t> vec;
               vec.resize(msg.size());
               std::memcpy(vec.data(), msg.data(), msg.size());
-              auto j = json::from_msgpack(vec);
+              auto j = json::from_msgpack(vec);  // Parsing
+
               long timestamp = j.value("timestamp", (long)0);
               std::vector<IntegratedRobot::Action> actions;
               for (const auto& arr : j["action"]) {
@@ -163,6 +220,10 @@ int main(int argc, char** argv) {
                 for (int i = 0; i < arr.size(); i++) {
                   act.actions[i] = arr[i].template get<double>();
                 }
+                const int idx = 2 + 6 + 7 + 7 + 2;
+                act.actions(idx + 0) = (act.actions(idx + 0) - 3.98988) / (13.522 - 3.98988);
+                act.actions(idx + 1) = (act.actions(idx + 1) - 5.59596) / (15.1726 - 5.59596);
+
                 actions.push_back(act);
               }
 
@@ -171,51 +232,38 @@ int main(int argc, char** argv) {
           });
         }
 
-        double weight_sum{0};
-        rb::y1a::IntegratedRobot::Action ref;
-        ref.actions.setZero();
-        if (false) {
-          while (!que.empty()) {
-            auto item = que.front();
-            if (item.timestamp <= current_time) {
-              ref.actions += item.weight * item.action.actions;
-              weight_sum += item.weight;
-            } else {
-              break;
-            }
-            que.pop();
-          }
+        if (!que.empty()) {
+          auto item = que.front();
+          que.pop();
+          last_inference_action = item;
         }
 
-        if (true) {
-          while (!que.empty()) {
-            auto item = que.front();
+        IntegratedRobot::Action prev_action = action;
+        // LPF
+        action.actions = lpf_gain * last_inference_action.actions + (1 - lpf_gain) * action.actions;
+        // Keep position of wheel and torso
+        action.actions.head<2 + 6>() = prev_action.actions.head<2 + 6>();
 
-            ref.actions += item.weight * item.action.actions;
-            weight_sum += item.weight;
+        /*****************
+         * LOGGING
+         *****************/
+        AddDataIntoDataSet(log_action, {26}, last_inference_action.actions.data());
+        AddDataIntoDataSet(log_qpos_ref, {26}, action.actions.data());
+        Eigen::Vector<double, 26> qpos;
+        qpos.head<24>() = obs.robot_qpos;
+        qpos.tail<2>() = obs.gripper_qpos;
+        AddDataIntoDataSet(log_qpos, {26}, qpos.data());
+        Eigen::Vector<double, 26> last_obs_qpos;
+        last_obs_qpos.head<24>() = last_obs.robot_qpos;
+        last_obs_qpos.tail<2>() = last_obs.gripper_qpos;
+        AddDataIntoDataSet(log_last_obs, {26}, last_obs_qpos.data());
 
-            que.pop();
-            break;
-          }
-        }
-
-        if (weight_sum > 0) {
-          ref.actions /= weight_sum;
-
-          ref.actions(2 + 6 + 7 + 7 + 2 + 0) = (ref.actions(2 + 6 + 7 + 7 + 2 + 0) - 3.98988) / (13.522 - 3.98988);
-          ref.actions(2 + 6 + 7 + 7 + 2 + 1) = (ref.actions(2 + 6 + 7 + 7 + 2 + 1) - 5.59596) / (15.1726 - 5.59596);
-
-          target = ref;
-        }
-
-        Eigen::Vector<double, 2 + 6> tmp = action.actions.block<2 + 6, 1>(0, 0);
-        action.actions = lpf_gain * target.actions + (1 - lpf_gain) * action.actions;
-        action.actions.tail<2>() = target.actions.tail<2>();
-        action.actions.block<2 + 6, 1>(0, 0) = tmp;
+        // action.actions[2 + 6 + 7 + 7 + 0] = 0;
+        // action.actions[2 + 6 + 7 + 7 + 1] = 45 * M_PI / 180;
 
         robot.Step(action, 1. / fps * 1.01);
       },
-      std::chrono::nanoseconds((long)(1.e9 / fps)));
+      nanoseconds((long)(1.e9 / fps)));
 
   while (true) {
     std::this_thread::sleep_for(1s);

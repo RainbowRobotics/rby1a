@@ -1,4 +1,4 @@
-
+find_package(HDF5 REQUIRED)
 add_subdirectory(third-party)
 
 add_executable(example_robot

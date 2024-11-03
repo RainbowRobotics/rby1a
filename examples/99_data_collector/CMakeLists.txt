@@ -1,4 +1,3 @@
-find_package(HDF5 REQUIRED)
 add_subdirectory(third-party)
 
 add_executable(data_collector

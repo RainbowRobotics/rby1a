@@ -5,7 +5,7 @@
 	path = examples/99_data_collector/third-party/json
 	url = https://github.com/nlohmann/json.git
 [submodule "examples/99_data_collector/third-party/HighFive"]
-	path = examples/99_data_collector/third-party/HighFive
+	path = examples/third-party/HighFive
 	url = https://github.com/BlueBrain/HighFive.git
 [submodule "third-party/eigen"]
 	path = third-party/eigen
